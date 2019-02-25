@@ -206,7 +206,9 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     target_init = tf.group([tf.assign(v_targ, v_main)
                               for v_main, v_targ in zip(get_vars('main'), get_vars('target'))])
 
-    sess = tf.Session()
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    sess = tf.Session(config=config)
     sess.run(tf.global_variables_initializer())
     sess.run(target_init)
 
