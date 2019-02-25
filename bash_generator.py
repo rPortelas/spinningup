@@ -19,7 +19,7 @@ with open(filename, 'w') as f:
     gpu_id = 0
     for seed in range(len(trial_id)):
         t_id = trial_id[seed]
-        f.write("$EXP_INTERP spinup/algos/sac/sac.py --exp_name %s --seed %s --epochs 10 --gpu_id %s\n" % (logdir_name, t_id, gpu_id))
+        f.write("$EXP_INTERP spinup/algos/sac/sac.py --exp_name %s --seed %s --epochs 10 --gpu_id %s&\n" % (logdir_name, t_id, gpu_id))
         gpu_id += 1
         if gpu_id == 4:
             gpu_id = 0
