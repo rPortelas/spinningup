@@ -331,6 +331,7 @@ if __name__ == '__main__':
     parser.add_argument('--exp_name', type=str, default='sac')
     parser.add_argument('--gpu_id', type=int, default=-1)
     parser.add_argument('--ent_coef', type=float, default=0.2)
+    parser.add_argument('--max_ep_len', type=int, default=1000)
     args = parser.parse_args()
 
     from spinup.utils.run_utils import setup_logger_kwargs
@@ -342,4 +343,4 @@ if __name__ == '__main__':
     sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(),
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-        logger_kwargs=logger_kwargs, alpha=args.ent_coef)
+        logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len)
