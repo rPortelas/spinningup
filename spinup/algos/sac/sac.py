@@ -212,6 +212,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     sess.run(tf.global_variables_initializer())
     sess.run(target_init)
 
+
     # Setup model saving
     logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, 
                                 outputs={'mu': mu, 'pi': pi, 'q1': q1, 'q2': q2, 'v': v})
@@ -249,6 +250,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             a = env.action_space.sample()
 
         # Step the env
+
         o2, r, d, _ = env.step(a)
         ep_ret += r
         ep_len += 1
@@ -328,6 +330,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--exp_name', type=str, default='sac')
     parser.add_argument('--gpu_id', type=int, default=-1)
+    parser.add_argument('--ent_coef', type=float, default=0.2)
     args = parser.parse_args()
 
     from spinup.utils.run_utils import setup_logger_kwargs
@@ -339,4 +342,4 @@ if __name__ == '__main__':
     sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(),
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-        logger_kwargs=logger_kwargs)
+        logger_kwargs=logger_kwargs, alpha=args.ent_coef)
