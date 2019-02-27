@@ -291,8 +291,8 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
 
         # End of epoch wrap-up
-        if t > 0 and t % steps_per_epoch == 0:
-            epoch = t // steps_per_epoch
+        if t > 0 and (t + 1) % steps_per_epoch == 0:
+            epoch = (t + 1) // steps_per_epoch
 
             # Save model
             if (epoch % save_freq == 0) or (epoch == epochs-1):
@@ -332,6 +332,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', type=int, default=-1)
     parser.add_argument('--ent_coef', type=float, default=0.2)
     parser.add_argument('--max_ep_len', type=int, default=1000)
+    parser.add_argument('--steps_per_ep', type=int, default=100000)
     args = parser.parse_args()
 
     from spinup.utils.run_utils import setup_logger_kwargs
@@ -343,4 +344,4 @@ if __name__ == '__main__':
     sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(),
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-        logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len)
+        logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len, steps_per_epoch=args.steps_per_ep)
