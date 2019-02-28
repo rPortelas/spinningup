@@ -307,7 +307,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.log_tabular('TestEpRet', with_min_and_max=True)
             logger.log_tabular('EpLen', average_only=True)
             logger.log_tabular('TestEpLen', average_only=True)
-            logger.log_tabular('TotalEnvInteracts', t)
+            logger.log_tabular('TotalEnvInteracts', t+1)
             logger.log_tabular('Q1Vals', with_min_and_max=True) 
             logger.log_tabular('Q2Vals', with_min_and_max=True) 
             logger.log_tabular('VVals', with_min_and_max=True) 
@@ -323,7 +323,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
-    parser.add_argument('--hid', type=int, default=300)
+    parser.add_argument('--hid', type=int, default=-1)
     parser.add_argument('--l', type=int, default=1)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
@@ -341,7 +341,10 @@ if __name__ == '__main__':
     if args.gpu_id != -1:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
 
+    ac_kwargs = dict()
+    if args.hid != -1:
+        ac_kwargs['hidden_sizes'] = [args.hid]*args.l
     sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
-        ac_kwargs=dict(),
+        ac_kwargs=ac_kwargs,
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
         logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len, steps_per_epoch=args.steps_per_ep)
