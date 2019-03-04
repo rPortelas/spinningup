@@ -333,6 +333,8 @@ if __name__ == '__main__':
     parser.add_argument('--ent_coef', type=float, default=0.2)
     parser.add_argument('--max_ep_len', type=int, default=1000)
     parser.add_argument('--steps_per_ep', type=int, default=100000)
+    parser.add_argument('--buf_size', type=int, default=1000000)
+
     args = parser.parse_args()
 
     from spinup.utils.run_utils import setup_logger_kwargs
@@ -347,4 +349,5 @@ if __name__ == '__main__':
     sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=ac_kwargs,
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-        logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len, steps_per_epoch=args.steps_per_ep)
+        logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
+        steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size)
