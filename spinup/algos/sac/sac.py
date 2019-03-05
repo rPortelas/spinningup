@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import gym
+import gym_flowers
 import time
 from spinup.algos.sac import core
 from spinup.algos.sac.core import get_vars
@@ -48,7 +49,7 @@ Soft Actor-Critic
 def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0, 
         steps_per_epoch=100000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000, 
-        max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
+        max_ep_len=1000, logger_kwargs=dict(), save_freq=1, env_babbling="none"):
     """
 
     Args:
@@ -129,6 +130,13 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             the current policy and value function.
 
     """
+    def set_env_params():
+        if env_babbling == "random":
+            random_stump_height = (np.random.random(2) * max_stump_height)
+            random_stump_height.sort()
+            print(random_stump_height)
+            env.env.set_environment(roughness=None, stump_height=random_stump_height.tolist(), gap_width=None, step_height=None, step_number=None)
+
 
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
@@ -137,7 +145,14 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     np.random.seed(seed)
 
     env, test_env = env_fn(), env_fn()
-    obs_dim = env.observation_space.shape[0]
+    if env_babbling == "random":
+        max_stump_height = 3
+        test_env.env.set_environment(roughness=None, stump_height=[0,max_stump_height], gap_width=None, step_height=None, step_number=None)
+        test_env.reset()
+    set_env_params()
+    env.reset()
+
+    obs_dim = env.env.observation_space.shape[0]
     act_dim = env.action_space.shape[0]
 
     # Action limit for clamping: critically, assumes all dimensions share the same bound!
@@ -288,6 +303,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
+            set_env_params()
 
 
         # End of epoch wrap-up
@@ -334,7 +350,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_ep_len', type=int, default=1000)
     parser.add_argument('--steps_per_ep', type=int, default=100000)
     parser.add_argument('--buf_size', type=int, default=1000000)
-
+    parser.add_argument('--env_babbling', type=str, default="none")
     args = parser.parse_args()
 
     from spinup.utils.run_utils import setup_logger_kwargs
@@ -346,8 +362,9 @@ if __name__ == '__main__':
     ac_kwargs = dict()
     if args.hid != -1:
         ac_kwargs['hidden_sizes'] = [args.hid]*args.l
+
     sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=ac_kwargs,
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
         logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
-        steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size)
+        steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size, env_babbling=args.env_babbling)
