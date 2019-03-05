@@ -134,7 +134,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         if env_babbling == "random":
             random_stump_height = (np.random.random(2) * max_stump_height)
             random_stump_height.sort()
-            print(random_stump_height)
+            #print(random_stump_height)
             env.env.set_environment(roughness=None, stump_height=random_stump_height.tolist(), gap_width=None, step_height=None, step_number=None)
 
 
