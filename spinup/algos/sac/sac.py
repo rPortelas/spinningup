@@ -131,14 +131,14 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     """
     def set_env_params(**kwargs):
-        b2_epsilon = 1.192092896e-07
+        epsilon = 1e-03
         if env_babbling == "random":
             random_stump_height = (np.random.random(2) * kwargs['stump_height'][1])
             random_stump_height.sort()
 
-            if np.abs(random_stump_height[1] - random_stump_height[0]) < b2_epsilon:
+            if np.abs(random_stump_height[1] - random_stump_height[0]) < epsilon:
                 print('tosmall')
-                random_stump_height[1] += 2*b2_epsilon
+                random_stump_height[1] += epsilon
             print(random_stump_height)
             env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_height.tolist(),
                                     gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
@@ -165,6 +165,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     env.reset()
 
     obs_dim = env.env.observation_space.shape[0]
+    #print(obs_dim)
     act_dim = env.action_space.shape[0]
 
     # Action limit for clamping: critically, assumes all dimensions share the same bound!
@@ -317,7 +318,8 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             set_env_params(**env_kwargs)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
-
+            #env.render()
+            #print(len(o))
 
         # End of epoch wrap-up
         if t > 0 and (t + 1) % steps_per_epoch == 0:
