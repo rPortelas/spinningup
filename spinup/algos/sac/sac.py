@@ -49,7 +49,7 @@ Soft Actor-Critic
 def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0, 
         steps_per_epoch=100000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000, 
-        max_ep_len=1000, logger_kwargs=dict(), save_freq=1, env_babbling="none"):
+        max_ep_len=1000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict()):
     """
 
     Args:
@@ -130,12 +130,25 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             the current policy and value function.
 
     """
-    def set_env_params():
+    def set_env_params(**kwargs):
+        b2_epsilon = 1.192092896e-07
         if env_babbling == "random":
-            random_stump_height = (np.random.random(2) * max_stump_height)
+            random_stump_height = (np.random.random(2) * kwargs['stump_height'][1])
             random_stump_height.sort()
-            #print(random_stump_height)
-            env.env.set_environment(roughness=None, stump_height=random_stump_height.tolist(), gap_width=None, step_height=None, step_number=None)
+
+            if np.abs(random_stump_height[1] - random_stump_height[0]) < b2_epsilon:
+                print('tosmall')
+                random_stump_height[1] += 2*b2_epsilon
+            print(random_stump_height)
+            env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_height.tolist(),
+                                    gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
+                                    step_number=kwargs['step_number'])
+
+    def set_test_env_params(**kwargs):
+        if env_babbling == "random":
+            test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=[0,kwargs['stump_height'][1]],
+                                    gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
+                                    step_number=kwargs['step_number'])
 
 
     logger = EpochLogger(**logger_kwargs)
@@ -145,11 +158,10 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     np.random.seed(seed)
 
     env, test_env = env_fn(), env_fn()
-    if env_babbling == "random":
-        max_stump_height = 3
-        test_env.env.set_environment(roughness=None, stump_height=[0,max_stump_height], gap_width=None, step_height=None, step_number=None)
-        test_env.reset()
-    set_env_params()
+    set_test_env_params(**env_kwargs)
+    test_env.reset()
+
+    set_env_params(**env_kwargs)
     env.reset()
 
     obs_dim = env.env.observation_space.shape[0]
@@ -240,6 +252,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         global sess, mu, pi, q1, q2, q1_pi, q2_pi
         for j in range(n):
             o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
+            #test_env.render()
             while not(d or (ep_len == max_ep_len)):
                 # Take deterministic actions at test time 
                 o, r, d, _ = test_env.step(get_action(o, True))
@@ -302,8 +315,8 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                              VVals=outs[6], LogPi=outs[7])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
+            set_env_params(**env_kwargs)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
-            set_env_params()
 
 
         # End of epoch wrap-up
@@ -350,7 +363,14 @@ if __name__ == '__main__':
     parser.add_argument('--max_ep_len', type=int, default=1000)
     parser.add_argument('--steps_per_ep', type=int, default=100000)
     parser.add_argument('--buf_size', type=int, default=1000000)
+    # Parameterized bipedal walker related arguments
     parser.add_argument('--env_babbling', type=str, default="none")
+    parser.add_argument('--max_stump_h', type=float, default=None)
+    parser.add_argument('--roughness', type=float, default=None)
+    parser.add_argument('--max_gap_w', type=float, default=None)
+    parser.add_argument('--step_h', type=float, default=None)
+    parser.add_argument('--step_nb', type=float, default=None)
+
     args = parser.parse_args()
 
     from spinup.utils.run_utils import setup_logger_kwargs
@@ -363,8 +383,15 @@ if __name__ == '__main__':
     if args.hid != -1:
         ac_kwargs['hidden_sizes'] = [args.hid]*args.l
 
+    env_kwargs = {'roughness':args.roughness,
+                  'stump_height':None if args.max_stump_h is None else [0,args.max_stump_h],
+                  'gap_width':args.max_gap_w,
+                  'step_height':args.step_h,
+                  'step_number':args.step_nb}
+
     sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=ac_kwargs,
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
         logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
-        steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size, env_babbling=args.env_babbling)
+        steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size,
+        env_babbling=args.env_babbling, env_kwargs=env_kwargs)
