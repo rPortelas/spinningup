@@ -6,6 +6,7 @@ import time
 from spinup.algos.sac import core
 from spinup.algos.sac.core import get_vars
 from spinup.utils.logx import EpochLogger
+from spinup.utils.normalization_utils import MaxMinFilter
 import os
 
 
@@ -49,7 +50,8 @@ Soft Actor-Critic
 def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0, 
         steps_per_epoch=100000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000, 
-        max_ep_len=1000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict()):
+        max_ep_len=1000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict(),
+        norm_obs=False, env_name='unknown'):
     """
 
     Args:
@@ -145,8 +147,20 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                                     step_number=kwargs['step_number'])
 
     def set_test_env_params(**kwargs):
+        # if env_babbling == "random":
+        #     test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=[0,kwargs['stump_height'][1]],
+        #                             gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
+        #                             step_number=kwargs['step_number'])
+        epsilon = 1e-03
         if env_babbling == "random":
-            test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=[0,kwargs['stump_height'][1]],
+            random_stump_height = (np.random.random(2) * kwargs['stump_height'][1])
+            random_stump_height.sort()
+
+            if np.abs(random_stump_height[1] - random_stump_height[0]) < epsilon:
+                print('tosmall')
+                random_stump_height[1] += epsilon
+            print(random_stump_height)
+            test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_height.tolist(),
                                     gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
                                     step_number=kwargs['step_number'])
 
@@ -173,6 +187,16 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     # Share information about action space with policy architecture
     ac_kwargs['action_space'] = env.action_space
+
+    # Obs normalization
+    if norm_obs:
+        if env_name == 'BipedalWalker-v2' or env_name == 'BipedalWalkerHardcore-v2':
+            norm = MaxMinFilter()
+        elif env_name == 'flowers-Walker-v2':
+            assert env_babbling == 'random'
+            norm = MaxMinFilter(env_params_dict=env_kwargs)
+
+
 
     # Inputs to computation graph
     x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
@@ -252,22 +276,24 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     def test_agent(n=10):
         global sess, mu, pi, q1, q2, q1_pi, q2_pi
         for j in range(n):
+            set_test_env_params(**env_kwargs)
             o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
-            #test_env.render()
+            o = norm(o) if norm_obs else o
             while not(d or (ep_len == max_ep_len)):
                 # Take deterministic actions at test time 
                 o, r, d, _ = test_env.step(get_action(o, True))
+                o = norm(o) if norm_obs else o
                 ep_ret += r
                 ep_len += 1
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
+    o = norm(o) if norm_obs else o
     total_steps = steps_per_epoch * epochs
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
-
         """
         Until start_steps have elapsed, randomly sample actions
         from a uniform distribution for better exploration. Afterwards, 
@@ -281,6 +307,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         # Step the env
 
         o2, r, d, _ = env.step(a)
+        o2 = norm(o2) if norm_obs else o2
         ep_ret += r
         ep_len += 1
 
@@ -318,8 +345,9 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             set_env_params(**env_kwargs)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
-            #env.render()
-            #print(len(o))
+            #print('not norm {}'.format(o))
+            o = norm(o) if norm_obs else o
+            #print('norm {}'.format(o))
 
         # End of epoch wrap-up
         if t > 0 and (t + 1) % steps_per_epoch == 0:
@@ -372,6 +400,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_gap_w', type=float, default=None)
     parser.add_argument('--step_h', type=float, default=None)
     parser.add_argument('--step_nb', type=float, default=None)
+    parser.add_argument('--norm_obs', type=bool, default=False)
 
     args = parser.parse_args()
 
@@ -396,4 +425,4 @@ if __name__ == '__main__':
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
         logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
         steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size,
-        env_babbling=args.env_babbling, env_kwargs=env_kwargs)
+        env_babbling=args.env_babbling, env_kwargs=env_kwargs, norm_obs=args.norm_obs, env_name=args.env)
