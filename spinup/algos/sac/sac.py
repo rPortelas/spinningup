@@ -146,7 +146,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 #print(random_stump_height)
             env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_height.tolist(),
                                     gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
-                                    step_number=kwargs['step_number'])
+                                    step_number=kwargs['step_number'], env_param_input=kwargs['env_param_input'])
         return params
 
     def set_test_env_params(**kwargs):
@@ -166,7 +166,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
             test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_height.tolist(),
                                         gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
-                                        step_number=kwargs['step_number'])
+                                        step_number=kwargs['step_number'], env_param_input=kwargs['env_param_input'])
 
 
         return params
@@ -181,7 +181,6 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     env_params_train = []
     env_params_test = []
     env, test_env = env_fn(), env_fn()
-    test_env.reset()
 
     env_params_train.append(set_env_params(**env_kwargs))
     env.reset()
@@ -419,7 +418,8 @@ if __name__ == '__main__':
     parser.add_argument('--max_gap_w', type=float, default=None)
     parser.add_argument('--step_h', type=float, default=None)
     parser.add_argument('--step_nb', type=float, default=None)
-    parser.add_argument('--norm_obs', type=bool, default=False)
+    parser.add_argument('--norm_obs', type=int, default=False)
+    parser.add_argument('--env_param_input', type=int, default=True)
 
     args = parser.parse_args()
 
@@ -437,11 +437,12 @@ if __name__ == '__main__':
                   'stump_height':None if args.max_stump_h is None else [0,args.max_stump_h],
                   'gap_width':args.max_gap_w,
                   'step_height':args.step_h,
-                  'step_number':args.step_nb}
-
+                  'step_number':args.step_nb,
+                  'env_param_input':args.env_param_input}
     sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=ac_kwargs,
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
         logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
         steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size,
-        env_babbling=args.env_babbling, env_kwargs=env_kwargs, norm_obs=args.norm_obs, env_name=args.env)
+        env_babbling=args.env_babbling, env_kwargs=env_kwargs, norm_obs=args.norm_obs,
+        env_name=args.env)
