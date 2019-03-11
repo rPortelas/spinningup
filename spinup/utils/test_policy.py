@@ -6,6 +6,10 @@ import tensorflow as tf
 from spinup import EpochLogger
 from spinup.utils.logx import restore_tf_graph
 import numpy as np
+from spinup.utils.normalization_utils import MaxMinFilter
+import imageio
+from matplotlib import pyplot as plt
+
 
 def load_policy(fpath, itr='last', deterministic=False):
 
@@ -43,7 +47,7 @@ def load_policy(fpath, itr='last', deterministic=False):
     return env, get_action
 
 
-def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True):
+def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, make_gif=True):
 
     assert env is not None, \
         "Environment not found!\n\n It looks like the environment wasn't saved, " + \
@@ -51,17 +55,59 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True):
         "page on Experiment Outputs for how to handle this situation."
 
     logger = EpochLogger()
-    env.env.set_environment(roughness=None, stump_height=[0.0, 2.0], gap_width=None, step_height=None,
-                            step_number=None)
+    env_babbling = "none"
+    norm_obs = False
+    def set_test_env_params(**kwargs):
+        # if env_babbling == "random":
+        #     test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=[0,kwargs['stump_height'][1]],
+        #                             gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
+        #                             step_number=kwargs['step_number'])
+        epsilon = 1e-03
+        if env_babbling == "random":
+            random_stump_height = (np.random.random(2) * kwargs['stump_height'][1])
+            random_stump_height.sort()
+
+            if np.abs(random_stump_height[1] - random_stump_height[0]) < epsilon:
+                print('tosmall')
+                random_stump_height[1] += epsilon
+            print(random_stump_height)
+            env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_height.tolist(),
+                                    gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
+                                    step_number=kwargs['step_number'])
+    env_kwargs = {'roughness':None,
+                  'stump_height':[0,1],
+                  'gap_width':None,
+                  'step_height':None,
+                  'step_number':None}
+
+    if norm_obs:
+        norm = MaxMinFilter(env_params_dict=env_kwargs)
+
+    images = []
+
+    set_test_env_params(**env_kwargs)
     o, r, d, ep_ret, ep_len, n = env.reset(), 0, False, 0, 0, 0
+    img = env.render(mode='rgb_array')
+    o = norm(o) if norm_obs else o
     obss = [o]
+    skip = 2
+    cpt = 0
+
     while n < num_episodes:
         if render:
-            env.render()
+            cpt+=1
+            if cpt == skip:
+                if make_gif:
+                    images.append(img)
+                    img = env.render(mode='rgb_array')
+                else:
+                    env.render()
+                cpt = 0
             time.sleep(1e-3)
 
         a = get_action(o)
         o, r, d, _ = env.step(a)
+        o = norm(o) if norm_obs else o
         obss.append(o)
         ep_ret += r
         ep_len += 1
@@ -69,15 +115,20 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True):
         if d or (ep_len == max_ep_len):
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             print('Episode %d \t EpRet %.3f \t EpLen %d'%(n, ep_ret, ep_len))
+            set_test_env_params(**env_kwargs)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
+            o = norm(o) if norm_obs else o
             n += 1
-            print("MAX:{}".format(np.max(obss, axis=0)))
-            print("MIN:{}".format(np.min(obss,axis=0)))
+            #print("MAX:{}".format(np.max(obss, axis=0)))
+            #print("MIN:{}".format(np.min(obss,axis=0)))
 
 
     logger.log_tabular('EpRet', with_min_and_max=True)
     logger.log_tabular('EpLen', average_only=True)
     logger.dump_tabular()
+    print(len(images))
+    print(np.array(images[0]).shape)
+    imageio.mimsave('bipwalkersmall.gif', [np.array(img)[200:315,:,:] for i, img in enumerate(images)], fps=29)
 
 
 if __name__ == '__main__':
@@ -85,7 +136,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('fpath', type=str)
     parser.add_argument('--len', '-l', type=int, default=0)
-    parser.add_argument('--episodes', '-n', type=int, default=100)
+    parser.add_argument('--episodes', '-n', type=int, default=1)
     parser.add_argument('--norender', '-nr', action='store_true')
     parser.add_argument('--itr', '-i', type=int, default=-1)
     parser.add_argument('--deterministic', '-d', action='store_true')
