@@ -4,12 +4,12 @@ import gym
 import gym_flowers
 import time
 from spinup.algos.sac import core
+from spinup.algos.sac.env_params_selection import EnvParamsSelector
 from spinup.algos.sac.core import get_vars
 from spinup.utils.logx import EpochLogger
 from spinup.utils.normalization_utils import MaxMinFilter
 import os
 import pickle
-import cProfile
 
 class ReplayBuffer:
     """
@@ -52,7 +52,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=100000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000, 
         max_ep_len=1000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict(),
-        norm_obs=False, env_name='unknown'):
+        norm_obs=False, env_name='unknown', nb_test_episodes=15):
     """
 
     Args:
@@ -133,43 +133,6 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             the current policy and value function.
 
     """
-    def set_env_params(**kwargs):
-        epsilon = 1e-03
-        params = []
-        if env_babbling == "random":
-            if kwargs['stump_height'] is not None:
-                random_stump_height = (np.random.random(2) * kwargs['stump_height'][1])
-                random_stump_height.sort()
-                if np.abs(random_stump_height[1] - random_stump_height[0]) < epsilon:
-                    random_stump_height[1] += epsilon
-                params += random_stump_height.tolist()
-                #print(random_stump_height)
-            env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_height.tolist(),
-                                    gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
-                                    step_number=kwargs['step_number'], env_param_input=kwargs['env_param_input'])
-        return params
-
-    def set_test_env_params(**kwargs):
-        epsilon = 1e-03
-        params = []
-        test_mode = "random"
-        if env_babbling == "random":
-            if test_mode == "random":
-                if kwargs['stump_height'] is not None:
-                    random_stump_height = (np.random.random(2) * kwargs['stump_height'][1])
-                    random_stump_height.sort()
-                    if np.abs(random_stump_height[1] - random_stump_height[0]) < epsilon:
-                        random_stump_height[1] += epsilon
-                    params += random_stump_height.tolist()
-            elif test_mode == "levels":
-                pass
-
-            test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_height.tolist(),
-                                        gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
-                                        step_number=kwargs['step_number'], env_param_input=kwargs['env_param_input'])
-
-
-        return params
 
 
     logger = EpochLogger(**logger_kwargs)
@@ -178,11 +141,15 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     tf.set_random_seed(seed)
     np.random.seed(seed)
 
+    # Parameterized env init
+    env_params = EnvParamsSelector(env_babbling, nb_test_episodes)
     env_params_train = []
     env_params_test = []
+
     env, test_env = env_fn(), env_fn()
 
-    env_params_train.append(set_env_params(**env_kwargs))
+
+    env_params_train.append(env_params.set_env_params(env,env_kwargs))
     env.reset()
 
     obs_dim = env.env.observation_space.shape[0]
@@ -283,7 +250,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     def test_agent(n=10):
         global sess, mu, pi, q1, q2, q1_pi, q2_pi
         for j in range(n):
-            env_params_test.append(set_test_env_params(**env_kwargs))
+            env_params_test.append(env_params.set_test_env_params(test_env, env_kwargs))
             o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
             o = norm(o) if norm_obs else o
             while not(d or (ep_len == max_ep_len)):
@@ -294,10 +261,6 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 ep_len += 1
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
-
-
-    cp = cProfile.Profile()
-    cp.enable()
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
     o = norm(o) if norm_obs else o
@@ -355,7 +318,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
 
-            env_params_train.append(set_env_params(**env_kwargs))
+            env_params_train.append(env_params.set_env_params(env, env_kwargs))
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
             #print('not norm {}'.format(o))
             o = norm(o) if norm_obs else o
@@ -370,7 +333,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 logger.save_state({'env': env}, None)
 
             # Test the performance of the deterministic version of the agent.
-            test_agent()
+            test_agent(n=nb_test_episodes)
             # Log info about epoch
             logger.log_tabular('Epoch', epoch)
             logger.log_tabular('EpRet', with_min_and_max=True)
@@ -393,8 +356,6 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             with open(logger.output_dir+'/env_params_save.pkl', 'wb') as handle:
                 pickle.dump({'env_params_train':env_params_train,
                              'env_params_test': env_params_test}, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    cp.disable()
-    cp.dump_stats(logger.output_dir+'/profiling.cprof')
 
 if __name__ == '__main__':
     import argparse
@@ -420,6 +381,7 @@ if __name__ == '__main__':
     parser.add_argument('--step_nb', type=float, default=None)
     parser.add_argument('--norm_obs', type=int, default=False)
     parser.add_argument('--env_param_input', type=int, default=True)
+    parser.add_argument('--nb_test_episodes', type=int, default=15)
 
     args = parser.parse_args()
 
@@ -445,4 +407,4 @@ if __name__ == '__main__':
         logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
         steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size,
         env_babbling=args.env_babbling, env_kwargs=env_kwargs, norm_obs=args.norm_obs,
-        env_name=args.env)
+        env_name=args.env, nb_test_episodes=args.nb_test_episodes)
