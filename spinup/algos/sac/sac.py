@@ -146,6 +146,10 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     env_params_train = []
     env_params_test = []
 
+    # Record all test data
+    env_test_rewards = []
+    env_test_len = []
+
     env, test_env = env_fn(), env_fn()
 
 
@@ -260,6 +264,8 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 ep_ret += r
                 ep_len += 1
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
+            env_test_rewards.append(ep_ret)
+            env_test_len.append(ep_len)
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -355,7 +361,9 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             #print(logger.output_dir+'/env_params_save.pkl')
             with open(logger.output_dir+'/env_params_save.pkl', 'wb') as handle:
                 pickle.dump({'env_params_train':env_params_train,
-                             'env_params_test': env_params_test}, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                             'env_params_test': env_params_test,
+                             'env_test_rewards': env_test_rewards,
+                             'env_test_len': env_test_len}, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 if __name__ == '__main__':
     import argparse
