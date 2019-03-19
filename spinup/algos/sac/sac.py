@@ -50,8 +50,8 @@ Soft Actor-Critic
 """
 def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0, 
         steps_per_epoch=100000, epochs=100, replay_size=int(1e6), gamma=0.99,
-        polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000, 
-        max_ep_len=1000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict(),
+        polyak=0.995, lr=1e-3, alpha=0.005, batch_size=100, start_steps=10000,
+        max_ep_len=2000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict(),
         norm_obs=False, env_name='unknown', nb_test_episodes=15):
     """
 
@@ -143,17 +143,11 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     # Parameterized env init
     env_params = EnvParamsSelector(env_babbling, nb_test_episodes)
-    env_params_train = []
-    env_params_test = []
-
-    # Record all test data
-    env_test_rewards = []
-    env_test_len = []
 
     env, test_env = env_fn(), env_fn()
 
 
-    env_params_train.append(env_params.set_env_params(env,env_kwargs))
+    env_params.set_env_params(env,env_kwargs)
     env.reset()
 
     obs_dim = env.env.observation_space.shape[0]
@@ -254,7 +248,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     def test_agent(n=10):
         global sess, mu, pi, q1, q2, q1_pi, q2_pi
         for j in range(n):
-            env_params_test.append(env_params.set_test_env_params(test_env, env_kwargs))
+            env_params.set_test_env_params(test_env, env_kwargs)
             o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
             o = norm(o) if norm_obs else o
             while not(d or (ep_len == max_ep_len)):
@@ -264,8 +258,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                 ep_ret += r
                 ep_len += 1
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
-            env_test_rewards.append(ep_ret)
-            env_test_len.append(ep_len)
+            env_params.record_test_episode(ep_ret, ep_len)
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -323,8 +316,8 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                              VVals=outs[6], LogPi=outs[7])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
-
-            env_params_train.append(env_params.set_env_params(env, env_kwargs))
+            env_params.record_train_episode(ep_ret, ep_len)
+            env_params.set_env_params(env, env_kwargs)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
             #print('not norm {}'.format(o))
             o = norm(o) if norm_obs else o
@@ -336,7 +329,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
             # Save model
             if (epoch % save_freq == 0) or (epoch == epochs-1):
-                logger.save_state({'env': env}, None)
+                logger.save_state({'env': env}, itr=epoch)
 
             # Test the performance of the deterministic version of the agent.
             test_agent(n=nb_test_episodes)
@@ -359,11 +352,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             logger.dump_tabular()
             # Pickle parameterized env data
             #print(logger.output_dir+'/env_params_save.pkl')
-            with open(logger.output_dir+'/env_params_save.pkl', 'wb') as handle:
-                pickle.dump({'env_params_train':env_params_train,
-                             'env_params_test': env_params_test,
-                             'env_test_rewards': env_test_rewards,
-                             'env_test_len': env_test_len}, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            env_params.dump(logger.output_dir+'/env_params_save.pkl')
 
 if __name__ == '__main__':
     import argparse
@@ -376,8 +365,8 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--exp_name', type=str, default='sac')
     parser.add_argument('--gpu_id', type=int, default=-1)
-    parser.add_argument('--ent_coef', type=float, default=0.2)
-    parser.add_argument('--max_ep_len', type=int, default=1000)
+    parser.add_argument('--ent_coef', type=float, default=0.005)
+    parser.add_argument('--max_ep_len', type=int, default=2000)
     parser.add_argument('--steps_per_ep', type=int, default=100000)
     parser.add_argument('--buf_size', type=int, default=1000000)
     # Parameterized bipedal walker related arguments
@@ -390,6 +379,7 @@ if __name__ == '__main__':
     parser.add_argument('--norm_obs', type=int, default=False)
     parser.add_argument('--env_param_input', type=int, default=True)
     parser.add_argument('--nb_test_episodes', type=int, default=15)
+    parser.add_argument('--lr', type=float, default=1e-3)
 
     args = parser.parse_args()
 
@@ -415,4 +405,4 @@ if __name__ == '__main__':
         logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
         steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size,
         env_babbling=args.env_babbling, env_kwargs=env_kwargs, norm_obs=args.norm_obs,
-        env_name=args.env, nb_test_episodes=args.nb_test_episodes)
+        env_name=args.env, nb_test_episodes=args.nb_test_episodes, lr=args.lr)

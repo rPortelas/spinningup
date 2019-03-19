@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 
 class EnvParamsSelector(object):
     def __init__(self, env_babbling, nb_test_episodes):
@@ -6,7 +7,47 @@ class EnvParamsSelector(object):
         self.nb_test_episodes = nb_test_episodes
         self.test_ep_counter = 0
         self.eps= 1e-03
-        pass
+
+        if env_babbling == 'oracle':
+            self.min_stump_height = 0.0
+            self.max_stump_height = 0.5
+            self.mutation = 0.1
+            self.mutation_rate = 50 #mutate each 50 episodes
+            self.mutation_thr = 230 #reward threshold
+
+        #data recording
+        self.env_params_train = []
+        self.env_train_rewards = []
+        self.env_train_len = []
+
+        self.env_params_test = []
+        self.env_test_rewards = []
+        self.env_test_len = []
+
+    def record_train_episode(self, reward, ep_len):
+        self.env_train_rewards.append(reward)
+        self.env_train_len.append(ep_len)
+        if (len(self.env_train_rewards) % self.mutation_rate) == 0:
+            mean_ret = np.mean(self.env_train_rewards[-50:])
+            if mean_ret > self.mutation_thr:
+                self.min_stump_height += self.mutation
+                self.max_stump_height += self.mutation
+            print('mut step: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_stump_height, self.max_stump_height))
+
+
+    def record_test_episode(self, reward, ep_len):
+        self.env_test_rewards.append(reward)
+        self.env_test_len.append(ep_len)
+
+    def dump(self, filename):
+        with open(filename, 'wb') as handle:
+            pickle.dump({'env_params_train': self.env_params_train,
+                         'env_train_rewards': self.env_train_rewards,
+                         'env_train_len': self.env_train_len,
+                         'env_params_test': self.env_params_test,
+                         'env_test_rewards': self.env_test_rewards,
+                         'env_test_len': self.env_test_len}, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
 
     def get_random_stump_params(self, min_stump_height, max_stump_height):
         random_stump_height = np.random.uniform(min_stump_height, max_stump_height,2)
@@ -17,14 +58,20 @@ class EnvParamsSelector(object):
 
     def set_env_params(self, env, kwargs):
         params = []
+        random_stump_h = None
         if self.env_babbling == "random":
             if kwargs['stump_height'] is not None:
                 random_stump_h = self.get_random_stump_params(kwargs['stump_height'][0],kwargs['stump_height'][1])
                 params += random_stump_h
                 #print(random_stump_h)
-            env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_h,
-                                    gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
-                                    step_number=kwargs['step_number'], env_param_input=kwargs['env_param_input'])
+        elif self.env_babbling == "oracle":
+            if kwargs['stump_height'] is not None:
+                random_stump_h = self.get_random_stump_params(self.min_stump_height,self.max_stump_height)
+                params += random_stump_h
+        env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_h,
+                                gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
+                                step_number=kwargs['step_number'], env_param_input=kwargs['env_param_input'])
+        self.env_params_train.append(params)
         return params
 
     def set_test_env_params(self, test_env, kwargs):
@@ -34,7 +81,7 @@ class EnvParamsSelector(object):
         epsilon = 1e-03
         params = []
         test_mode = "levels"
-        if self.env_babbling == "random":
+        if self.env_babbling is not "none":
             if test_mode == "random":
                 if kwargs['stump_height'] is not None:
                     random_stump_h = self.get_random_stump_params(kwargs['stump_height'][0], kwargs['stump_height'][1])
@@ -62,4 +109,5 @@ class EnvParamsSelector(object):
 
         if self.test_ep_counter == self.nb_test_episodes:
             self.test_ep_counter = 0
+        self.env_params_test.append(params)
         return params
