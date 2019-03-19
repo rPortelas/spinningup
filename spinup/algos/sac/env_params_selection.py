@@ -27,12 +27,13 @@ class EnvParamsSelector(object):
     def record_train_episode(self, reward, ep_len):
         self.env_train_rewards.append(reward)
         self.env_train_len.append(ep_len)
-        if (len(self.env_train_rewards) % self.mutation_rate) == 0:
-            mean_ret = np.mean(self.env_train_rewards[-50:])
-            if mean_ret > self.mutation_thr:
-                self.min_stump_height += self.mutation
-                self.max_stump_height += self.mutation
-            print('mut step: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_stump_height, self.max_stump_height))
+        if self.env_babbling == 'oracle':
+            if (len(self.env_train_rewards) % self.mutation_rate) == 0:
+                mean_ret = np.mean(self.env_train_rewards[-50:])
+                if mean_ret > self.mutation_thr:
+                    self.min_stump_height += self.mutation
+                    self.max_stump_height += self.mutation
+                print('mut step: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_stump_height, self.max_stump_height))
 
 
     def record_test_episode(self, reward, ep_len):
