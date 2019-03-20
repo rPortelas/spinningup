@@ -329,7 +329,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
             # Save model
             if (epoch % save_freq == 0) or (epoch == epochs-1):
-                logger.save_state({'env': env}, itr=epoch)
+                logger.save_state({'env': env}, None)#itr=epoch)
 
             # Test the performance of the deterministic version of the agent.
             test_agent(n=nb_test_episodes)
