@@ -2,6 +2,7 @@ import numpy as np
 from gym.spaces import Box
 from collections import deque
 from imgep_utils.dataset import BufferedDataset
+from imgep_utils.gep_utils import proportional_choice
 
 
 # Implementation of SAGG-RIAC
@@ -15,31 +16,32 @@ class SAGG_RIAC():
         self.regions = [[deque(maxlen=self.maxlen + 1), deque(maxlen=self.maxlen + 1)]]
         self.region_bounds = [Box(min, max, dtype=np.float32)]
         self.interest = [0.]
-        self.probas = [1.]
         self.nb_dims = len(min)
         self.window_cp = 100
-        self.temperature = 20
+        #self.temperature = 20
         self.nb_split_attempts = 50
         self.max_difference = 0.2
         self.init_size = max - min
         self.ndims = len(min)
 
         self.sampled_goals = []
-        self.interest_knn = BufferedDataset(self.ndims, self.ndims, buffer_size=200, lateness=0)
-
     def compute_interests(self, sub_regions):
         interest = np.zeros([len(sub_regions)])
         for i in range(len(sub_regions)):
             if len(sub_regions[i][0]) > 10:  # hyperparam TODO
                 cp_window = min(len(sub_regions[i][0]), self.window_cp)  # not completely window
+                #half = int(cp_window/2)
+                #if (cp_window % 2) == 1: cp_window -= 1
+                #print(str(cp_window) + 'and' + str(half))
+                # diff = np.array(sub_regions[i][0])[-cp_window:-half] -\
+                #        np.array(sub_regions[i][0])[-half:]
+                # cp = np.abs(diff.mean())
                 cp = np.abs(np.array(sub_regions[i][0])[-cp_window:].mean())
             else:
                 cp = 0
             interest[i] = np.abs(cp)
-            exp_int = np.exp(self.temperature * np.array(interest))
-            probas = exp_int / exp_int.sum()
-            probas = probas.tolist()
-        return interest.tolist(), probas
+
+        return interest.tolist()
 
     def update(self, goals, outcomes, continuous_competence):
         #print(continuous_competence)
@@ -105,7 +107,7 @@ class SAGG_RIAC():
                             sub_regions = [sub_reg1, sub_reg2]
 
                         # compute interest
-                        interest, _ = self.compute_interests(sub_regions)
+                        interest = self.compute_interests(sub_regions)
 
                         # compute score
                         split_score = len(sub_reg1) * len(sub_reg2) * np.abs(interest[0] - interest[1])
@@ -151,14 +153,10 @@ class SAGG_RIAC():
                 self.interest.insert(reg, 0)
                 self.interest.insert(reg, 0)
 
-                self.probas.pop(reg)
-                self.probas.insert(reg, 0)
-                self.probas.insert(reg, 0)
-
             # recompute interest
-            self.interest, self.probas = self.compute_interests(self.regions)
+            self.interest = self.compute_interests(self.regions)
 
-            assert len(self.probas) == len(self.regions)
+            assert len(self.interest) == len(self.regions)
             return new_split, all_order
 
         else:
@@ -169,11 +167,7 @@ class SAGG_RIAC():
 
     def sample_goal(self):
         # sample region
-        if np.random.rand() < 0.2:
-            region_id = np.random.choice(range(self.nb_regions))
-        else:
-            region_id = np.random.choice(range(self.nb_regions), p=np.array(self.probas))
-
+        region_id = proportional_choice(self.interest, eps=0.2)
         # sample goal
         self.sampled_goals.append(self.region_bounds[region_id].sample())
 

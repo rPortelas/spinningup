@@ -3,6 +3,7 @@ import pickle
 import sys
 from gep_utils import *
 
+
 def inside_polygon(x, y, points):
     """
     Return True if a coordinate (x, y) is inside a polygon defined by
