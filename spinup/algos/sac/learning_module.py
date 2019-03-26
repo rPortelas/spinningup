@@ -35,7 +35,7 @@ class LearningModule(object):
         self.current_goal = None
         if self.goal_sampling == 'active':
             self.act_goal_sampling = SAGG_RIAC(np.array([-1.]*self.o_size),
-                                               np.array([1.]*self.o_size), continuous_competence=True)
+                                               np.array([1.]*self.o_size))
 
     # sample a goal in outcome space and find closest neighbor in (param,outcome) database
     # RETURN policy param with added gaussian noise

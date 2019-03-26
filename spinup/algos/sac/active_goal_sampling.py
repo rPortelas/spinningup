@@ -8,7 +8,7 @@ from imgep_utils.dataset import BufferedDataset
 
 class SAGG_RIAC():
     #min: [-1,-1] max:[1,1]
-    def __init__(self, min, max, continuous_competence=False):
+    def __init__(self, min, max):
 
         assert len(min) == len(max)
         self.maxlen = 50
@@ -20,26 +20,19 @@ class SAGG_RIAC():
         self.window_cp = 100
         self.temperature = 20
         self.nb_split_attempts = 50
-        self.continuous_competence = continuous_competence
         self.max_difference = 0.2
         self.init_size = max - min
         self.ndims = len(min)
 
         self.sampled_goals = []
-        if self.continuous_competence:
-            self.interest_knn = BufferedDataset(self.ndims, self.ndims, buffer_size=200, lateness=0)
+        self.interest_knn = BufferedDataset(self.ndims, self.ndims, buffer_size=200, lateness=0)
 
     def compute_interests(self, sub_regions):
         interest = np.zeros([len(sub_regions)])
         for i in range(len(sub_regions)):
             if len(sub_regions[i][0]) > 10:  # hyperparam TODO
-                if self.continuous_competence:
-                    cp_window = min(len(sub_regions[i][0]), self.window_cp)  # not completely window
-                    cp = np.abs(np.array(sub_regions[i][0])[-cp_window:].mean())
-                else:
-                    cp_window = min(len(sub_regions[i][0]) // 2, self.window_cp)
-                    cp = np.array(sub_regions[i][0])[- 2 * cp_window: - cp_window].mean() - np.array(sub_regions[i][0])[
-                                                                                            - cp_window:].mean()
+                cp_window = min(len(sub_regions[i][0]), self.window_cp)  # not completely window
+                cp = np.abs(np.array(sub_regions[i][0])[-cp_window:].mean())
             else:
                 cp = 0
             interest[i] = np.abs(cp)
@@ -48,7 +41,7 @@ class SAGG_RIAC():
             probas = probas.tolist()
         return interest.tolist(), probas
 
-    def update(self, goals, outcomes, continuous_competence=None):
+    def update(self, goals, outcomes, continuous_competence):
         #print(continuous_competence)
         if len(goals) > 0:
             new_split = False
@@ -60,14 +53,11 @@ class SAGG_RIAC():
                         regions[i] = j
                         break
 
-            if self.continuous_competence:
-                c_or_cps = continuous_competence
-            else:
-                c_or_cps = binary_competence
+            cps = continuous_competence
 
             # add new outcomes and goals to regions
-            for reg, c_or_cp, goal in zip(regions, c_or_cps, goals):
-                self.regions[reg][0].append(c_or_cp)
+            for reg, cp, goal in zip(regions, cps, goals):
+                self.regions[reg][0].append(cp)
                 self.regions[reg][1].append(goal)
 
             # check if need to split
