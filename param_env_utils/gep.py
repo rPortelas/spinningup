@@ -1,6 +1,6 @@
 from learning_module import LearningModule
 import numpy as np
-from imgep_utils.gep_utils import proportional_choice, get_random_policy
+from param_env_utils.imgep_utils.gep_utils import proportional_choice, get_random_policy
 
 
 class GEP(object):

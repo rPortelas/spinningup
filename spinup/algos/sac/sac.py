@@ -4,12 +4,12 @@ import gym
 import gym_flowers
 import time
 from spinup.algos.sac import core
-from spinup.algos.sac.env_params_selection import EnvParamsSelector
+from param_env_utils.env_params_selection import EnvParamsSelector
 from spinup.algos.sac.core import get_vars
 from spinup.utils.logx import EpochLogger
 from spinup.utils.normalization_utils import MaxMinFilter
 import os
-import pickle
+
 
 class ReplayBuffer:
     """
@@ -142,12 +142,12 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     np.random.seed(seed)
 
     # Parameterized env init
-    env_params = EnvParamsSelector(env_babbling, nb_test_episodes)
+    env_params = EnvParamsSelector(env_babbling, nb_test_episodes, env_kwargs)
 
     env, test_env = env_fn(), env_fn()
 
 
-    env_params.set_env_params(env,env_kwargs)
+    if env_babbling is not "none": env_params.set_env_params(env,env_kwargs)
     env.reset()
 
     obs_dim = env.env.observation_space.shape[0]
@@ -248,7 +248,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     def test_agent(n=10):
         global sess, mu, pi, q1, q2, q1_pi, q2_pi
         for j in range(n):
-            env_params.set_test_env_params(test_env, env_kwargs)
+            if env_babbling is not "none": env_params.set_test_env_params(test_env, env_kwargs)
             o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
             o = norm(o) if norm_obs else o
             while not(d or (ep_len == max_ep_len)):
@@ -317,7 +317,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             env_params.record_train_episode(ep_ret, ep_len)
-            env_params.set_env_params(env, env_kwargs)
+            if env_babbling is not "none": env_params.set_env_params(env, env_kwargs)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
             #print('not norm {}'.format(o))
             o = norm(o) if norm_obs else o
@@ -377,7 +377,7 @@ if __name__ == '__main__':
     parser.add_argument('--step_h', type=float, default=None)
     parser.add_argument('--step_nb', type=float, default=None)
     parser.add_argument('--norm_obs', type=int, default=False)
-    parser.add_argument('--env_param_input', type=int, default=True)
+    parser.add_argument('--env_param_input', type=int, default=False)
     parser.add_argument('--nb_test_episodes', type=int, default=15)
     parser.add_argument('--lr', type=float, default=1e-3)
 

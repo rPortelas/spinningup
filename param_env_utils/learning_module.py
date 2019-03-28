@@ -1,6 +1,6 @@
 import numpy as np
-from imgep_utils.gep_utils import get_random_policy
-from imgep_utils.dataset import BufferedDataset
+from param_env_utils.imgep_utils.gep_utils import get_random_policy
+from param_env_utils.imgep_utils.dataset import BufferedDataset
 import copy
 from active_goal_sampling import SAGG_RIAC
 

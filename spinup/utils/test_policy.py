@@ -75,7 +75,7 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
                                     gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
                                     step_number=kwargs['step_number'])
     env_kwargs = {'roughness':None,
-                  'stump_height':[1.33, 2.00],#stump_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
+                  'stump_height':[1.33, 2.0],#stump_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
                   'gap_width':None,
                   'step_height':None,
                   'step_number':None}
