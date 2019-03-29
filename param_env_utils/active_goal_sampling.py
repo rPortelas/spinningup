@@ -181,7 +181,7 @@ class SAGG_RIAC():
             assert len(self.probas) == len(self.regions)
             # bk-keeping
             if new_split:
-                self.all_boxes.append(copy.copy(self.regions))
+                self.all_boxes.append(copy.copy(self.region_bounds))
                 self.all_interests.append(copy.copy(self.interest))
                 self.split_iterations.append(self.update_nb)
             return new_split, all_order
