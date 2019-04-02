@@ -55,7 +55,7 @@ class SAGG_RIAC():
             probas = probas.tolist()
         return interest.tolist(), probas
 
-    def update(self, goals, continuous_competence, all_rewards):
+    def update(self, goals, continuous_competence, all_raw_rewards):
         if not isinstance(continuous_competence, list):
             continuous_competence = [continuous_competence]
         if not isinstance(goals[0], list):

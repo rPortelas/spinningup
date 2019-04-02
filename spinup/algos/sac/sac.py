@@ -371,7 +371,9 @@ if __name__ == '__main__':
     parser.add_argument('--buf_size', type=int, default=1000000)
     # Parameterized bipedal walker related arguments
     parser.add_argument('--env_babbling', type=str, default="none")
+    #parser.add_argument('--max_stump_h', type=float, default=None)
     parser.add_argument('--max_stump_h', type=float, default=None)
+    parser.add_argument('--max_tunnel_h', type=float, default=None)
     parser.add_argument('--roughness', type=float, default=None)
     parser.add_argument('--max_gap_w', type=float, default=None)
     parser.add_argument('--step_h', type=float, default=None)
@@ -394,7 +396,8 @@ if __name__ == '__main__':
         ac_kwargs['hidden_sizes'] = [args.hid]*args.l
 
     env_kwargs = {'roughness':args.roughness,
-                  'stump_height':None if args.max_stump_h is None else [0,args.max_stump_h],
+                  'stump_height': None if args.max_stump_h is None else [0, args.max_stump_h],
+                  'tunnel_height': None if args.max_tunnel_h is None else [0, args.max_tunnel_h],
                   'gap_width':args.max_gap_w,
                   'step_height':args.step_h,
                   'step_number':args.step_nb,
