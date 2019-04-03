@@ -179,7 +179,8 @@ class EnvParamsSelector(object):
         #print("test_ep_nb:{}".format(self.test_ep_counter))
 
         epsilon = 1e-03
-        params = {'stump_height':None, 'tunnel_height':None}
+        random_stump_h = None
+        random_tunnel_h = None
         test_mode = "levels"
         if test_mode == "random":
             if kwargs['stump_height'] is not None:
@@ -213,15 +214,12 @@ class EnvParamsSelector(object):
                 # fixed std when both
                 pass
 
-        params['stump_height'] = random_stump_h
-        params['tunnel_height'] = random_tunnel_h
         self.env_params_test['stump_hs'].append(random_stump_h)
         self.env_params_test['tunnel_hs'].append(random_tunnel_h)
-        test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=params['stump_height'],
-                                     tunnel_height=params['tunnel_height'],
+        test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_h,
+                                     tunnel_height=random_tunnel_h,
                                      gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
                                      step_number=kwargs['step_number'], env_param_input=kwargs['env_param_input'])
 
         if self.test_ep_counter == self.nb_test_episodes:
             self.test_ep_counter = 0
-        return params
