@@ -26,6 +26,7 @@ class BaselineGoalGenerator(object):
             self.mutation = 0.1
             self.min_tunnel_height = 1.5
             self.max_tunnel_height = 2.0
+            self.oracle_std = 0.3
 
             self.mutation_rate = 50 #mutate each 50 episodes
             self.mutation_thr = 230 #reward threshold
@@ -43,9 +44,10 @@ class BaselineGoalGenerator(object):
         elif self.env_babbling == "oracle":
             if kwargs['stump_height'] is not None:
                 random_stump_h = get_mu_sigma(self.min_stump_height, self.max_stump_height)
+                random_stump_h[1] = self.oracle_std
             if kwargs['tunnel_height'] is not None:
                 random_tunnel_h = get_mu_sigma(self.min_tunnel_height, self.max_tunnel_height)
-
+                random_tunnel_h[1] = self.oracle_std
         if (kwargs['stump_height'] is not None) and (kwargs['tunnel_height'] is not None): #if multi dim, fix std
             random_stump_h = [random_stump_h[0], 0.3]
             random_tunnel_h = [random_tunnel_h[0], 0.3]
@@ -199,16 +201,17 @@ class EnvParamsSelector(object):
                 assert (max_stump_height == 2)
                 stump_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
                 random_stump_h = get_mu_sigma(stump_levels[current_level][0], stump_levels[current_level][1])
+                random_stump_h[1] = 0.3
             if kwargs['tunnel_height'] is not None:
                 max_tunnel_height = kwargs['tunnel_height'][1]
                 assert(max_tunnel_height == 2)
                 tunnel_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
                 tunnel_levels.reverse() #shorter is harder
                 random_tunnel_h = get_mu_sigma(tunnel_levels[current_level][0], tunnel_levels[current_level][1])
+                random_tunnel_h[1] = 0.3
             if (kwargs['tunnel_height'] is not None) and (kwargs['stump_height'] is not None):
                 # fixed std when both
-                random_stump_h[1] = 0.3
-                random_tunnel_h[1] = 0.3
+                pass
 
         params['stump_height'] = random_stump_h
         params['tunnel_height'] = random_tunnel_h
