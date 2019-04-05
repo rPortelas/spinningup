@@ -63,9 +63,9 @@ class BaselineGoalGenerator(object):
                     if self.train_env_kwargs['stump_height'] is not None:
                         self.min_stump_height += self.mutation
                         self.max_stump_height += self.mutation
-                    elif self.train_env_kwargs['tunnel_height'] is not None:
-                        self.min_tunnel_height -= self.mutation
-                        self.max_tunnel_height -= self.mutation
+                    if self.train_env_kwargs['tunnel_height'] is not None:
+                        self.min_tunnel_height -= self.mutation/2
+                        self.max_tunnel_height -= self.mutation/2
 
                 if self.train_env_kwargs['stump_height'] is not None:
                     print('mut stump: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_stump_height,
@@ -206,7 +206,7 @@ class EnvParamsSelector(object):
             if kwargs['tunnel_height'] is not None:
                 max_tunnel_height = kwargs['tunnel_height'][1]
                 assert(max_tunnel_height == 2)
-                tunnel_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
+                tunnel_levels = [[1.0, 1.3], [1.3, 1.6], [1.6, 1.9]]
                 tunnel_levels.reverse() #shorter is harder
                 random_tunnel_h = get_mu_sigma(tunnel_levels[current_level][0], tunnel_levels[current_level][1])
                 random_tunnel_h[1] = 0.3
