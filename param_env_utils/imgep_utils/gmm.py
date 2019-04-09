@@ -1,303 +1,89 @@
-from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import seaborn as sns; sns.set()
+from matplotlib.patches import Ellipse
 import numpy as np
-import sklearn.mixture
-from numpy.linalg import inv, eig
-from numpy import ix_, array, inf, sqrt, linspace, zeros, arctan2, matrix, pi
+from sklearn.datasets.samples_generator import make_blobs
+from sklearn.mixture import GaussianMixture as GMM
+from sklearn.datasets import make_moons
+import numpy as np
+import copy
+from gym.spaces import Box
 
-from .gaussian import Gaussian
-
-
-def schur_complement(mat, row, col):
-    """ compute the schur complement of the matrix block mat[row:,col:] of the matrix mat """
-    a = mat[:row, :col]
-    b = mat[:row, col:]
-    c = mat[row:, :col]
-    d = mat[row:, col:]
-    return a - b.dot(d.I).dot(c)
-
-
-def conditional(mean, covar, dims_in, dims_out, covariance_type='full'):
-    """ Return a function f such that f(x) = p(dims_out | dims_in = x) (f actually returns the mean and covariance of the conditional distribution
-    """
-    in_in = covar[ix_(dims_in, dims_in)]
-    in_out = covar[ix_(dims_in, dims_out)]
-    out_in = covar[ix_(dims_out, dims_in)]
-    out_out = covar[ix_(dims_out, dims_out)]
-    in_in_inv = inv(in_in)
-    out_in_dot_in_in_inv = out_in.dot(in_in_inv)
-
-    cond_covar = out_out - out_in_dot_in_in_inv.dot(in_out)
-    cond_mean = lambda x: mean[dims_out] + out_in_dot_in_in_inv.dot(x - mean[dims_in])
-    return lambda x: [cond_mean(x), cond_covar]
+class InterestGMM():
+    def __init__(self, min, max, n_components, seed=None):
+        if not seed:
+            seed = np.random.randint(424242)
+        self.gmm = GMM(n_components=n_components, covariance_type='full', random_state=seed)
+        self.random_goal_generator = Box(np.array(min), np.array(max), dtype=np.float32)
+        self.goals = []
 
 
-class GMM(sklearn.mixture.GaussianMixture):
-    def __init__(self, **kwargs):
-        sklearn.mixture.GaussianMixture.__init__(self, **kwargs)
-        self.in_dims = array([])
-        self.out_dims = array([])
+    def compute_interests(self, sub_regions):
+        pass
 
-    def __iter__(self):
-        for weight, mean, covar in zip(self.weights_, self.means_, self.covariances_):
-            yield (weight, mean, covar)
+    def update(self, goals, competences):
+        # if not isinstance(competences, list):
+        #     competences = [competences]
+        # if not isinstance(goals[0], list):
+        #     goals = [goals]
+        for g, c in zip(goals, competences):
+            self.goals.append(g)
 
-    def probability(self, value):
-        p = 0.
-        for k, (w, m, c) in enumerate(self):
-            p += w * Gaussian(m.reshape(-1,), c).normal(value.reshape(-1,))
-        return p
+        #re-fit
+        self.gmm.fit(self.goals)
 
-    def sub_gmm(self, inds_k):
-        gmm = GMM(n_components=len(inds_k), covariance_type=self.covariance_type)
-
-        gmm.weights_, gmm.means_, gmm.covariances_ = (self.weights_[inds_k],
-                                                self.means_[inds_k, :],
-                                                self.covariances_[inds_k, :, :])
-        gmm.weights_ = gmm.weights_ / gmm.weights_.sum()
-        return gmm
-
-    def conditional(self, in_dims, out_dims):
-        conditionals = []
-
-        for k, (weight_k, mean_k, covar_k) in enumerate(self):
-            conditionals.append(conditional(mean_k, covar_k,
-                                            in_dims, out_dims,
-                                            self.covariance_type))
-
-        cond_weights = lambda v: [(weight_k * Gaussian(mean_k[in_dims].reshape(-1,),
-                                  covar_k[ix_(in_dims, in_dims)]).normal(v.reshape(-1,)))
-                                  for k, (weight_k, mean_k, covar_k) in enumerate(self)]
-
-        def res(v):
-            gmm = GMM(n_components=self.n_components,
-                      covariance_type=self.covariance_type,
-                      random_state=self.random_state, thresh=self.thresh,
-                      min_covar=self.min_covar, n_iter=self.n_iter, n_init=self.n_init,
-                      params=self.params, init_params=self.init_params)
-            gmm.weights_ = cond_weights(v)
-            means_covars = [f(v) for f in conditionals]
-            gmm.means_ = array([mc[0] for mc in means_covars]).reshape(self.n_components,
-                                                                       -1)
-            gmm._set_covars(array([mc[1] for mc in means_covars]))
-            return gmm
-
-        return res
-
-        self.in_dims = array(in_dims)
-        self.out_dims = array(out_dims)
-        means = zeros((self.n_components, len(out_dims)))
-        covars = zeros((self.n_components, len(out_dims), len(out_dims)))
-        weights = zeros((self.n_components,))
-        sig_in = []
-        inin_inv = []
-        out_in = []
-        mu_in = []
-        for k, (weight_k, mean_k, covar_k) in enumerate(self):
-            sig_in.append(covar_k[ix_(in_dims, in_dims)])
-            inin_inv.append(matrix(sig_in).I)
-            out_in.append(covar_k[ix_(out_dims, in_dims)])
-            mu_in.append(mean_k[in_dims].reshape(-1, 1))
-
-            means[k, :] = (mean_k[out_dims] +
-                           (out_in *
-                            inin_inv *
-                            (value - mu_in)).T)
-
-            covars[k, :, :] = (covar_k[ix_(out_dims, out_dims)] -
-                               out_in *
-                               inin_inv *
-                               covar_k[ix_(in_dims, out_dims)])
-            weights[k] = weight_k * Gaussian(mu_in.reshape(-1,),
-                                             sig_in).normal(value.reshape(-1,))
-        weights /= sum(weights)
-
-        def p(value):
-            # hard copy of useful matrices local to the function
-            pass
-
-        return p
-
-    def inference(self, in_dims, out_dims, value=None):
-        """ Perform Bayesian inference on the gmm. Let's call V = V1...Vd the d-dimensional space on which the current GMM is defined, such that it represents P(V). Let's call X and Y to disjoint subspaces of V, with corresponding dimension indices in ran. This method returns the GMM for P(Y | X=value).
-
-        :param list in_dims: the dimension indices of X (a subset of range(d)). This can be the empty list if one want to compute the marginal P(Y).
-
-        :param list out_dims: the dimension indices of Y (a subset of range(d), without intersection with in_dims).
-
-        :param numpy.array value: the value of X for which one want to compute the conditional (ignored of in_dims=[]).
-
-        :returns: the gmm corresponding to P(Y | X=value) (or to P(Y) if in_dims=[])
-
-        .. note:: For example, if X = V1...Vm and Y = Vm+1...Vd, then P(Y | X=v1...vm) is returned by self.inference(in_dims=range(m), out_dims=range(m, d), array([v1, ..., vm])).
-        """
-
-        if self.covariance_type != 'diag' and self.covariance_type != 'full':
-            raise ValueError("covariance type other than 'full' and 'diag' not allowed")
-        in_dims = array(in_dims)
-        out_dims = array(out_dims)
-        value = array(value)
-
-        means = zeros((self.n_components, len(out_dims)))
-        covars = zeros((self.n_components, len(out_dims), len(out_dims)))
-        weights = zeros((self.n_components,))
-        if in_dims.size:
-            for k, (weight_k, mean_k, covar_k) in enumerate(self):
-
-                sig_in = covar_k[ix_(in_dims, in_dims)]
-                inin_inv = matrix(sig_in).I
-                out_in = covar_k[ix_(out_dims, in_dims)]
-                mu_in = mean_k[in_dims].reshape(-1, 1)
-                means[k, :] = (mean_k[out_dims] +
-                               (out_in *
-                                inin_inv *
-                                (value.reshape(-1, 1) - mu_in)).T)
-                if self.covariance_type == 'full':
-                    covars[k, :, :] = (covar_k[ix_(out_dims, out_dims)] -
-                                       out_in *
-                                       inin_inv *
-                                       covar_k[ix_(in_dims, out_dims)])
-                elif self.covariance_type == 'diag':
-                    covars[k, :] = covar_k[out_dims]
-
-                weights[k] = weight_k * Gaussian(mu_in.reshape(-1,),
-                                                 sig_in).normal(value.reshape(-1,))
-            weights /= sum(weights)
-        else:
-            means = self.means_[:, out_dims]
-            if self.covariance_type == 'full':
-                covars = self.covariances_[ix_(range(self.n_components), out_dims, out_dims)]
-            if self.covariance_type == 'diag':
-                covars = self.covariances_[ix_(range(self.n_components), out_dims)]
-            weights = self.weights_
-
-        res = GMM(n_components=self.n_components,
-                  covariance_type=self.covariance_type)
-        res.weights_ = weights
-        res.means_ = means
-        res.covariances_ = covars
-        return res
-
-    def ellipses2D(self, colors):
-        from matplotlib.patches import Ellipse
-
-        ellipses = []
-
-        for i, ((weight, mean, _), covar) in enumerate(zip(self, self._get_covars())):
-            (val, vect) = eig(covar)
-
-            el = Ellipse(mean,
-                         3.5 * sqrt(val[0]),
-                         3.5 * sqrt(val[1]),
-                         180. * arctan2(vect[1, 0], vect[0, 0]) / pi,
-                         fill=False,
-                         linewidth=2)
-
-            el.set_facecolor(colors[i])
-            el.set_fill(True)
-            el.set_alpha(0.5)
-
-            ellipses.append(el)
-
-        return ellipses
-
-    def ellipses3D(self):
-        from ..utils.ellipsoid import ellipsoid_3d
-        ellipsoids = []
-        for k, (weight_k, mean_k, covar_k) in enumerate(self):
-            ellipsoids.append(ellipsoid_3d(mean_k, covar_k))
-        return ellipsoids
-
-    def plot(self, ax, label=False):
-        self.plot_projection(ax, range(self.means_.shape[1]), label)
-
-    def plot_projection(self, ax, dims, label=False):
-        COLORS = self.weights_ / max(self.weights_)
-        COLORS = [str(c) for c in COLORS]
-        # COLORS = ['r', 'g', 'b', 'k', 'm']*10000
-        gmm_proj = self.inference([], dims, [])
-        if len(dims) == 1:
-            x_min, x_max = inf, -inf
-            for w, m, c in self:
-                x_min = min(x_min, m[0] - 3. * sqrt(c[0, 0]))
-                x_max = max(x_max, m[0] + 3. * sqrt(c[0, 0]))
-            x = linspace(x_min, x_max, 1000)
-            p = [self.probability(xx) for xx in x]
-            ax.plot(x, p)
-
-        elif len(dims) == 2:
-            els = gmm_proj.ellipses2D(COLORS)
-            for el in els:
-                ax.add_patch(el)
-        elif len(dims) == 3:
-            ellipsoids = gmm_proj.ellipses3D()
-            for x, y, z in ellipsoids:
-                ax.plot_wireframe(x, y, z,  rstride=4, cstride=4, color='b', alpha=0.2)
-        else:
-            print("Can only print 2D or 3D ellipses")
-        if label:
-            for k, (w, m, c) in enumerate(gmm_proj):
-                ax.text(* tuple(m), s=str(k))
-        ax.axis('tight')
+    def sample_goal(self, n_samples=1):
+        Xnew, _ = self.gmm.sample(n_samples=n_samples)
+        return Xnew
 
 
+def draw_ellipse(position, covariance, ax=None, **kwargs):
+    """Draw an ellipse with a given position and covariance"""
+    ax = ax or plt.gca()
+
+    # Convert covariance to principal axes
+    if covariance.shape == (2, 2):
+        U, s, Vt = np.linalg.svd(covariance)
+        angle = np.degrees(np.arctan2(U[1, 0], U[0, 0]))
+        width, height = 2 * np.sqrt(s)
+    else:
+        angle = 0
+        width, height = 2 * np.sqrt(covariance)
+
+    # Draw the Ellipse
+    for nsig in range(1, 4):
+        ax.add_patch(Ellipse(position, nsig * width, nsig * height,
+                             angle, **kwargs))
 
 
-class GmmInterest():
-    def __init__(self, conf, expl_dims, measure, n_samples=40, n_components=6):
-        def rand_bounds(bounds, n=1):
-            widths = np.tile(bounds[1, :] - bounds[0, :], (n, 1))
-            return widths * np.random.rand(n, bounds.shape[1]) + np.tile(bounds[0, :], (n, 1))
-        self.expl_dims = expl_dims
-        self.measure = measure
-        self.bounds = conf.bounds[:, expl_dims]
-        self.n_components = n_components
-        self.scale_t = 1  # 1. / n_samples
-        self.t = - self.scale_t * n_samples
-        self.scale_x = conf.bounds[1, expl_dims] - conf.bounds[0, expl_dims]
-        self.scale_measure = abs(measure(np.zeros_like(conf.bounds[0, :]),
-                                         np.zeros_like(conf.bounds[0])))
+def plot_gmm(gmm, X, label=True, ax=None):
+    ax = ax or plt.gca()
+    labels = gmm.fit(X).predict(X)
+    if label:
+        ax.scatter(X[:, 0], X[:, 1], c=labels, s=40, cmap='viridis', zorder=2)
+    else:
+        ax.scatter(X[:, 0], X[:, 1], s=40, zorder=2)
+    ax.axis('equal')
 
-        self.data = np.zeros((n_samples, len(expl_dims) + 2))
-        self.n_samples = n_samples
-        self.scaler = StandardScaler()
+    w_factor = 0.2 / gmm.weights_.max()
+    for pos, covar, w in zip(gmm.means_, gmm.covariances_, gmm.weights_):
+        draw_ellipse(pos, covar, alpha=w * w_factor)
 
-        for _ in range(n_samples):
-            self.update(rand_bounds(conf.bounds), rand_bounds(conf.bounds))
 
-    def sample(self):
-        x = self.gmm_choice.sample()
-        x = self.scaler.inverse_transform(np.hstack(([0.], x.flatten(), [0.])))[1:-1]
-        x = np.maximum(x, self.bounds[0, :])
-        x = np.minimum(x, self.bounds[1, :])
-        return x.T
+# Generate some data
+X, y_true = make_blobs(n_samples=400, centers=4,
+                       cluster_std=0.60, random_state=0)
+X = X[:, ::-1] # flip axes for better plotting
+rng = np.random.RandomState(13)
+X_stretched = np.dot(X, rng.randn(2, 2))
+Xmoon, ymoon = make_moons(200, noise=.05, random_state=0)
 
-    def update(self, xy, ms):
-        measure = self.measure(xy, ms)
-        self.data[self.t % self.n_samples, 0] = self.t
-        self.data[self.t % self.n_samples, -1] = measure
-        self.data[self.t % self.n_samples, 1:-1] = xy.flatten()[self.expl_dims]
-
-        self.t += self.scale_t
-        if abs(self.t % (self.n_samples * self.scale_t / 4.)) < self.scale_t:
-            self.update_gmm()
-
-        return self.t, xy.flatten()[self.expl_dims], measure
-
-    def update_gmm(self):
-        scaled_data = self.scaler.fit_transform(self.data)
-
-        self.gmm = GMM(n_components=self.n_components, covariance_type='full')
-        self.gmm.fit(np.array(scaled_data))
-        self.gmm_choice = self.gmm_interest()
-
-    def gmm_interest(self):
-        cov_t_c = np.array([self.gmm.covariances_[k, 0, -1]
-                               for k in range(self.gmm.n_components)])
-        cov_t_c = np.exp(cov_t_c)
-        # cov_t_c[cov_t_c <= 1e-100] = 1e-100
-
-        gmm_choice = self.gmm.inference([0], range(1, len(self.expl_dims) + 1), [1.])
-        gmm_choice.weights_ = cov_t_c
-        gmm_choice.weights_ /= np.array(gmm_choice.weights_).sum()
-
-        return gmm_choice
+gmm16 = InterestGMM([0,0],[1,1], n_components=16)
+#plot_gmm(gmm16, Xmoon, label=False)
+#plt.show(block=False)
+#plt.pause(1.0)
+gmm16.update(Xmoon, [0.]*len(Xmoon))
+Xnew = gmm16.sample_goal(n_samples=40)
+plt.scatter(Xnew[:, 0], Xnew[:, 1])
+plt.show(block=False)
+plt.pause(2.0)
