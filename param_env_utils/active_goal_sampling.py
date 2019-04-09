@@ -5,10 +5,9 @@ import copy
 
 
 # Implementation of SAGG-RIAC
-
 class SAGG_RIAC():
     #min: [-1,-1] max:[1,1]
-    def __init__(self, min, max):
+    def __init__(self, min, max, temperature=20):
 
         assert len(min) == len(max)
         self.maxlen = 200
@@ -18,7 +17,7 @@ class SAGG_RIAC():
         self.probas = [1.]
         self.nb_dims = len(min)
         self.window_cp = 200
-        self.temperature = 20
+        self.temperature = temperature
         self.nb_split_attempts = 50
         self.max_difference = 0.2
         self.init_size = max - min
@@ -223,4 +222,3 @@ class SAGG_RIAC():
     @property
     def get_regions(self):
         return self.region_bounds
-
