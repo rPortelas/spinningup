@@ -8,6 +8,30 @@ from sklearn.datasets import make_moons
 import numpy as np
 import copy
 from gym.spaces import Box
+from param_env_utils.imgep_utils.dataset import BufferedDataset
+from param_env_utils.imgep_utils.gep_utils import proportional_choice
+
+class EmpiricalLearningProgress():
+    def __init__(self, goal_size):
+        self.interest_knn = BufferedDataset(1, goal_size, buffer_size=500, lateness=0)
+
+    def get_lp(self, goal, competence):
+        interest = 0
+        if len(self.interest_knn) > 5:
+            # compute learning progress for new goal
+            dist, idx = self.interest_knn.nn_y(goal)
+            # closest_previous_goal = previous_goals[idx]
+            closest_previous_goal = self.interest_knn.get_y(idx[0])
+            closest_previous_goal_competence = self.interest_knn.get_x(idx[0])
+            # print 'closest previous goal is index:%s, val: %s' % (idx[0], closest_previous_goal)
+
+            # compute Progress as absolute difference in competence
+            progress = closest_previous_goal_competence - competence
+            interest = np.abs(progress)
+
+        # add to database
+        self.interest_knn.add_xy(competence, goal)
+        return interest
 
 class InterestGMM():
     def __init__(self, min, max, n_components, seed=None):
@@ -15,7 +39,10 @@ class InterestGMM():
             seed = np.random.randint(424242)
         self.gmm = GMM(n_components=n_components, covariance_type='full', random_state=seed)
         self.random_goal_generator = Box(np.array(min), np.array(max), dtype=np.float32)
+        self.lp_computer = EmpiricalLearningProgress(len(min))
         self.goals = []
+        self.lps = []
+        self.goals_lps = []
 
 
     def compute_interests(self, sub_regions):
@@ -28,11 +55,27 @@ class InterestGMM():
         #     goals = [goals]
         for g, c in zip(goals, competences):
             self.goals.append(g)
+            self.lps.append(self.lp_computer.get_lp(g, c))
+            self.goals_lps.append(g+self.lps[-1])
 
         #re-fit
         self.gmm.fit(self.goals)
 
     def sample_goal(self, n_samples=1):
+        self.lp_means = []
+        self.lp_stds = []
+        for pos, covar, w in zip(self.gmm.means_, self.gmm.covariances_, self.gmm.weights_):
+            self.lp_means.append(pos[-1])
+            self.lp_stds.append(covar[-1,-1])
+        goals = []
+        for _ in range(n_samples):
+            # sample gaussian
+            idx = proportional_choice(self.lp_means, eps=0.2)
+            # sample goal in gaussian
+            goals.append(np.random.multivariate_normal(self.gmm.means_[idx], self.gmm.covariances_[idx]))
+        return np.array(goals)
+
+    def old_sample_goal(self, n_samples=1):
         Xnew, _ = self.gmm.sample(n_samples=n_samples)
         return Xnew
 
@@ -83,7 +126,7 @@ gmm16 = InterestGMM([0,0],[1,1], n_components=16)
 #plt.show(block=False)
 #plt.pause(1.0)
 gmm16.update(Xmoon, [0.]*len(Xmoon))
-Xnew = gmm16.sample_goal(n_samples=40)
+Xnew = gmm16.sample_goal(n_samples=400)
 plt.scatter(Xnew[:, 0], Xnew[:, 1])
 plt.show(block=False)
 plt.pause(2.0)
