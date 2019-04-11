@@ -52,7 +52,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=100000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-3, alpha=0.005, batch_size=100, start_steps=10000,
         max_ep_len=2000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict(),
-        norm_obs=False, env_name='unknown', nb_test_episodes=15):
+        norm_obs=False, env_name='unknown', nb_test_episodes=15, train_freq=1):
     """
 
     Args:
@@ -302,7 +302,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             This is a slight difference from the SAC specified in the
             original paper.
             """
-            for j in range(ep_len):
+            for j in range(ep_len//train_freq):
                 batch = replay_buffer.sample_batch(batch_size)
                 feed_dict = {x_ph: batch['obs1'],
                              x2_ph: batch['obs2'],
@@ -382,6 +382,8 @@ if __name__ == '__main__':
     parser.add_argument('--env_param_input', type=int, default=False)
     parser.add_argument('--nb_test_episodes', type=int, default=15)
     parser.add_argument('--lr', type=float, default=1e-3)
+    parser.add_argument('--train_freq', type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=100)
 
     args = parser.parse_args()
 
@@ -408,4 +410,5 @@ if __name__ == '__main__':
         logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
         steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size,
         env_babbling=args.env_babbling, env_kwargs=env_kwargs, norm_obs=args.norm_obs,
-        env_name=args.env, nb_test_episodes=args.nb_test_episodes, lr=args.lr)
+        env_name=args.env, nb_test_episodes=args.nb_test_episodes, lr=args.lr, train_freq=args.train_freq,
+        batch_size=args.batch_size)
