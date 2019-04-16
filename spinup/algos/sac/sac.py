@@ -302,7 +302,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             This is a slight difference from the SAC specified in the
             original paper.
             """
-            for j in range(ep_len//train_freq):
+            for j in range(np.ceil(ep_len/train_freq).astype('int')):
                 batch = replay_buffer.sample_batch(batch_size)
                 feed_dict = {x_ph: batch['obs1'],
                              x2_ph: batch['obs2'],
@@ -375,6 +375,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_stump_h', type=float, default=None)
     parser.add_argument('--max_tunnel_h', type=float, default=None)
     parser.add_argument('--roughness', type=float, default=None)
+    parser.add_argument('--max_obstacle_spacing', type=float, default=None)
     parser.add_argument('--max_gap_w', type=float, default=None)
     parser.add_argument('--step_h', type=float, default=None)
     parser.add_argument('--step_nb', type=float, default=None)
@@ -400,6 +401,7 @@ if __name__ == '__main__':
     env_kwargs = {'roughness':args.roughness,
                   'stump_height': None if args.max_stump_h is None else [0, args.max_stump_h],
                   'tunnel_height': None if args.max_tunnel_h is None else [0, args.max_tunnel_h],
+                  'obstacle_spacing': None if args.max_obstacle_spacing is None else [0, args.max_obstacle_spacing],
                   'gap_width':args.max_gap_w,
                   'step_height':args.step_h,
                   'step_number':args.step_nb,
