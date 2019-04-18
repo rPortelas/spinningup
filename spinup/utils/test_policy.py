@@ -7,6 +7,8 @@ from spinup import EpochLogger
 from spinup.utils.logx import restore_tf_graph
 import numpy as np
 from spinup.utils.normalization_utils import MaxMinFilter
+import gym
+import gym_flowers
 import imageio
 from matplotlib import pyplot as plt
 
@@ -48,7 +50,7 @@ def load_policy(fpath, itr='last', deterministic=False):
 
 
 def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, make_gif=True):
-
+    #env = gym.make('flowers-Walker-continuous-v0')
     assert env is not None, \
         "Environment not found!\n\n It looks like the environment wasn't saved, " + \
         "and we can't run the agent in it. :( \n\n Check out the readthedocs " + \
@@ -66,18 +68,19 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
         random_stump_h = None
         if kwargs['stump_height'] is not None:
             random_stump_h = get_mu_sigma(kwargs['stump_height'][0], kwargs['stump_height'][1])
-            random_stump_h[1] = 0.3
+            random_stump_h[1] = 0.1
         if kwargs['tunnel_height'] is not None:
             random_tunnel_h = get_mu_sigma(kwargs['tunnel_height'][0], kwargs['tunnel_height'][1])
-            random_tunnel_h[1] = 0.3
+            random_tunnel_h[1] = 0.1
         env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_h,
-                                tunnel_height=random_tunnel_h,
+                                tunnel_height=random_tunnel_h, obstacle_spacing=kwargs['obstacle_spacing'],
                                 gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
                                 step_number=kwargs['step_number'])
 
     env_kwargs = {'roughness':None,
-                  'stump_height':[0.0,0.66],#stump_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
-                  'tunnel_height':[1.33,2.0],
+                  'stump_height':[1.3, 1.3],#stump_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
+                  'tunnel_height':None,
+                  'obstacle_spacing':0.2,
                   'gap_width':None,
                   'step_height':None,
                   'step_number':None}
@@ -125,12 +128,12 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
             #print("MIN:{}".format(np.min(obss,axis=0)))
 
 
-    # logger.log_tabular('EpRet', with_min_and_max=True)
-    # logger.log_tabular('EpLen', average_only=True)
-    # logger.dump_tabular()
-    # print(len(images))
-    # print(np.array(images[0]).shape)
-    # imageio.mimsave('graphics/oracletunnelstump.gif', [np.array(img)[200:315,:-320,:] for i, img in enumerate(images)], fps=29)
+    logger.log_tabular('EpRet', with_min_and_max=True)
+    logger.log_tabular('EpLen', average_only=True)
+    logger.dump_tabular()
+    print(len(images))
+    print(np.array(images[0]).shape)
+    imageio.mimsave('graphics/saggcontez.gif', [np.array(img)[200:315,:-320,:] for i, img in enumerate(images)], fps=29)
 
 
 if __name__ == '__main__':
@@ -138,7 +141,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('fpath', type=str)
     parser.add_argument('--len', '-l', type=int, default=0)
-    parser.add_argument('--episodes', '-n', type=int, default=2)
+    parser.add_argument('--episodes', '-n', type=int, default=1)
     parser.add_argument('--norender', '-nr', action='store_true')
     parser.add_argument('--itr', '-i', type=int, default=-1)
     parser.add_argument('--deterministic', '-d', action='store_true')
