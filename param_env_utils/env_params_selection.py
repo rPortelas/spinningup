@@ -230,7 +230,6 @@ class EnvParamsSelector(object):
             #     pass
             if kwargs['stump_height'] is not None:
                 max_stump_height = kwargs['stump_height'][1]
-                assert (max_stump_height == 2)
                 stump_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
                 random_stump_h = get_mu_sigma(stump_levels[current_level][0], stump_levels[current_level][1])
                 random_stump_h[1] = 0.3
