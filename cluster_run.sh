@@ -7,7 +7,8 @@
 
 export EXP_INTERP='/home/rportela/anaconda3/envs/tfGPU/bin/python' ;
 nb_gpus=4
-exp_name="bashest2"
+date=`date +%d-%m`
+exp_name="bashest2$date"
 
 # Create expe directory
 mkdir data/$exp_name
