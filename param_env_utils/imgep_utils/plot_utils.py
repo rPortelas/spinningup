@@ -7,6 +7,7 @@ import imageio
 import numpy as np
 import copy
 import os
+from matplotlib.patches import Ellipse
 
 def scatter_plot(data, ax=None, emph_data=None, xlabel='min stump height', ylabel='max stump height', xlim=None, ylim=None):
     if ax is None:
@@ -89,6 +90,121 @@ def region_plot_gif(all_boxes, interests, iterations, goals,
             plt.suptitle('Episode {}'.format(i), fontsize=20)
             plt.savefig(f_name, bbox_inches='tight')
             plt.close(f)
+            filenames.append(f_name)
+    for filename in filenames:
+        images.append(imageio.imread(filename))
+    imageio.mimsave(gifdir + gifname + '.gif', images, duration=0.3)
+
+
+def draw_ellipse(position, covariance, ax=None, **kwargs):
+    """Draw an ellipse with a given position and covariance"""
+    ax = ax or plt.gca()
+
+    if len(position) == 3:
+        covariance = covariance[0:2,0:2]
+        position = position[0:2]
+
+    # Convert covariance to principal axes
+    if covariance.shape == (2, 2):
+        U, s, Vt = np.linalg.svd(covariance)
+        angle = np.degrees(np.arctan2(U[1, 0], U[0, 0]))
+        width, height = 2 * np.sqrt(s)
+    else:
+        angle = 0
+        width, height = 2 * np.sqrt(covariance)
+
+    # Draw the Ellipse
+    for nsig in range(1, 4):
+        ax.add_patch(Ellipse(position, nsig * width, nsig * height,
+                             angle, **kwargs))
+
+def plot_gmm(weights, means, covariances, X, ax=None, xlim=[0,1], ylim=[0,1], xlabel='jkl', ylabel='jhgj'):
+    ax = ax or plt.gca()
+    colors = [plt.cm.jet(i) for i in X[:, 2]]
+    ax.scatter(X[:, 0], X[:, 1],c=colors, s=1, zorder=2)
+    #ax.axis('equal')
+    w_factor = 0.2 / weights.max()
+    for pos, covar, w in zip(means, covariances, weights):
+        draw_ellipse(pos, covar, alpha=w * w_factor)
+
+    cax, _ = cbar.make_axes(ax)
+    cb = cbar.ColorbarBase(cax, cmap=plt.cm.jet)
+    cb.set_label('Interest')
+    ax.axis('equal')
+    ax.set_xlim(left=xlim[0], right=xlim[1])
+    ax.set_ylim(bottom=ylim[0], top=ylim[1])
+
+def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None):
+    plt.ioff()
+    print("Making an exploration GIF: " + gifname)
+    # Create target Directory if don't exist
+    tmpdir = 'tmp/'
+    tmppath = gifdir + 'tmp/'
+    if not os.path.exists(tmppath):
+        os.mkdir(tmppath)
+        print("Directory ", tmppath, " Created ")
+    else:
+        print("Directory ", tmppath, " already exists")
+    filenames = []
+    images = []
+    for ws, covs, means, gs_lps, ep in zip(bk['weights'], bk['covariances'], bk['means'], bk['goals_lps'], bk['episodes']):
+            ax = plt.gca()
+            plot_gmm(ws, means, covs, gs_lps, ax=ax)
+            f_name = gifdir+tmpdir+"scatter_{}.png".format(ep)
+            plt.suptitle('Episode {}'.format(ep), fontsize=20)
+            plt.savefig(f_name, bbox_inches='tight')
+            plt.close()
+            filenames.append(f_name)
+    for filename in filenames:
+        images.append(imageio.imread(filename))
+    imageio.mimsave(gifdir + gifname + '.gif', images, duration=0.3)
+
+
+def plot_cmaes(mean, covariance, ints, X, currX=None, currInts=None,
+               ax=None, xlim=[-0.2,1.2], ylim=[-0.2,1.2], xlabel='jkl', ylabel='jhgj'):
+    ax = ax or plt.gca()
+    if len(ints) > 0:
+        colors = [plt.cm.jet(i) for i in ints]
+        #ax.scatter(X[:, 0], X[:, 1],c=colors, s=1, zorder=2, alpha=0.5)
+    #ax.axis('equal')
+    if currX is not None:
+        currColors = [plt.cm.jet(i) for i in currInts]
+        ax.scatter(currX[:, 0], currX[:, 1],c=currColors, s=5, zorder=2)
+    draw_ellipse(mean, covariance, alpha=0.5)
+
+    cax, _ = cbar.make_axes(ax)
+    cb = cbar.ColorbarBase(cax, cmap=plt.cm.jet)
+    cb.set_label('Interest')
+    ax.axis('equal')
+    ax.set_xlim(left=xlim[0], right=xlim[1])
+    ax.set_ylim(bottom=ylim[0], top=ylim[1])
+
+def cmaes_plot_gif(bk, gifname='testcmaes', gifdir='graphics/', ax=None):
+    plt.ioff()
+    print("Making an exploration GIF: " + gifname)
+    # Create target Directory if don't exist
+    tmpdir = 'tmp/'
+    tmppath = gifdir + 'tmp/'
+    if not os.path.exists(tmppath):
+        os.mkdir(tmppath)
+        print("Directory ", tmppath, " Created ")
+    else:
+        print("Directory ", tmppath, " already exists")
+    filenames = []
+    images = []
+    bk['goals'] = np.array(bk['goals'])
+    prev_ep = 0
+    for cov, mean, ep in zip(bk['covariances'], bk['means'], bk['episodes']):
+            ax = plt.gca()
+            plot_cmaes(mean, cov, bk['interests'][0:ep], bk['goals'][0:ep],
+                       currX=bk['goals'][prev_ep:ep], currInts=bk['interests'][prev_ep:ep], ax=ax)
+            prev_ep = ep
+            f_name = gifdir+tmpdir+"scatter_{}.png".format(ep)
+            plt.suptitle('Episode {}'.format(ep), fontsize=20)
+            plt.savefig(f_name, bbox_inches='tight')
+            # plt.show(block=False)
+            # plt.pause(0.5)
+            plt.close()
             filenames.append(f_name)
     for filename in filenames:
         images.append(imageio.imread(filename))
