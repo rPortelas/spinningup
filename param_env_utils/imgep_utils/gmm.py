@@ -35,18 +35,23 @@ class EmpiricalLearningProgress():
         return interest
 
 class InterestGMM():
-    def __init__(self, mins, maxs, n_components, seed=None):
+    def __init__(self, mins, maxs, n_components=None, seed=None):
+        self.seed = seed
         if not seed:
-            seed = np.random.randint(424242)
+            self.seed = np.random.randint(424242)
         self.mins = mins
         self.maxs = maxs
-        self.gmm = GMM(n_components=n_components, covariance_type='full', random_state=seed)
+        #self.gmm = GMM(n_components=n_components, covariance_type='full', random_state=self.seed)
         self.random_goal_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
         self.lp_computer = EmpiricalLearningProgress(len(mins))
         self.goals = []
         self.lps = []
         self.goals_lps = []
-        self.fit_rate = 100
+        self.fit_rate = 250
+        self.nb_random = 250
+        self.random_goal_ratio = 0.2
+        self.window = 250
+        self.potential_ks = np.arange(1,11,1)
 
     def update(self, goals, competences):
         # if not isinstance(competences, list):
@@ -59,15 +64,23 @@ class InterestGMM():
             self.goals_lps.append(np.array(g.tolist()+[self.lps[-1]]))
 
         #re-fit
-        if len(self.goals) >= 100:
+        if len(self.goals) >= self.nb_random:
             if (len(self.goals) % self.fit_rate) == 0:
                 #print(np.array(self.goals_lps).shape)
                 #print(np.array(self.goals_lps))
-                self.gmm.fit(np.array(self.goals_lps))
+                cur_goals_lps = np.array(self.goals_lps[-self.window:])
+                potential_gmms = [GMM(n_components=k, covariance_type='full', random_state=self.seed) for k in self.potential_ks]
+                potential_gmms = [g.fit(cur_goals_lps) for g in potential_gmms]#  fit all
+
+                bics = [m.bic(cur_goals_lps) for m in potential_gmms]
+                #plt.plot(self.potential_ks, bics, label='BIC')
+                #plt.show()
+                self.gmm = potential_gmms[np.argmin(bics)]
+                #self.gmm.fit(cur_goals_lps)
 
     def sample_goal(self, n_samples=1):
         new_goals = []
-        if len(self.goals) < 100:  # random goals until enough data is collected
+        if (len(self.goals) < self.nb_random) or (np.random.random() < self.random_goal_ratio):  # random goals until enough data is collected
             new_goals = [self.random_goal_generator.sample() for _ in range(n_samples)]
         else:
             self.lp_means = []

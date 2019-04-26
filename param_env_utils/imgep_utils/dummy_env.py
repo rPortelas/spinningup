@@ -11,7 +11,7 @@ import copy
 
 
 class DummyEnv(object):
-    def __init__(self, nb_cells=10):
+    def __init__(self, nb_cells=10, nb_random_dims=0):
         self.nb_cells = nb_cells
         self.step_size = 1/nb_cells
         self.x_bnds = np.arange(0,1+self.step_size,self.step_size)
@@ -21,9 +21,15 @@ class DummyEnv(object):
         self.cell_competence = self.cell_counts.copy()
         self.noise = 0.0
         self.max_per_cell = 100
+        self.nb_random_dims = nb_random_dims
+
+    def get_score(self):
+        score = np.where(self.cell_competence > (3*(self.max_per_cell/4)))
+        return len(score[0])
 
     def episode(self, point):
-        pts = point
+        assert(len(point) == 2 + self.nb_random_dims)
+        pts = point[0:2]
         if (pts[0] < 0.0) or (pts[1] < 0.0) or (pts[1] > 1.0) or (pts[0] > 1.0):
             print("OUT OF BOUNDS")
             self.points.append(pts)
@@ -99,31 +105,25 @@ def test_sagg_iac(env, nb_episodes, gif=True):
     if gif:
         region_plot_gif(all_boxes, interests, iterations, goal_generator.sampled_goals,
                         gifname='dummysagg', ep_len=[1]*nb_episodes, rewards=rewards, gifdir='gifs/')
+    return env.get_score()
 
-def test_interest_gmm(env, nb_episodes, gif=True):
-    print("gmm run")
-    goal_generator = InterestGMM([0, 0], [1, 1], n_components=4)
-    interests = []
+def test_interest_gmm(env, nb_episodes, gif=True, nb_dims=2):
+    goal_generator = InterestGMM([0]*nb_dims, [1]*nb_dims)
     rewards = []
-    bk = {'weights':[], 'covariances':[], 'means':[], 'goals_lps':[], 'episodes':[]}
+    bk = {'weights':[], 'covariances':[], 'means':[], 'goals_lps':[], 'episodes':[],
+          'comp_grids':[], 'comp_xs':[], 'comp_ys':[]}
     for i in range(nb_episodes):
         if (i % 500) == 0:
             print(env.cell_competence)
-            if i>100:
-                bk['weights'].append(goal_generator.gmm.weights_.copy())
-                bk['covariances'].append(goal_generator.gmm.covariances_.copy())
-                bk['means'].append(goal_generator.gmm.means_.copy())
-                bk['goals_lps'].append(np.array(goal_generator.goals_lps.copy()))
-                bk['episodes'].append(i)
-
-                # plot_gmm(bk['weights'][-1],
-                #          bk['means'][-1],
-                #          bk['covariances'][-1],
-                #          bk['goals_lps'][-1])
-                # plt.show(block=False)
-                # plt.pause(0.5)
-                # plt.close()
-
+        if i>100 and (i % goal_generator.fit_rate) == 0:
+            bk['weights'].append(goal_generator.gmm.weights_.copy())
+            bk['covariances'].append(goal_generator.gmm.covariances_.copy())
+            bk['means'].append(goal_generator.gmm.means_.copy())
+            bk['goals_lps'].append(np.array(goal_generator.goals_lps.copy()))
+            bk['episodes'].append(i)
+            bk['comp_grids'].append(env.cell_competence.copy())
+            bk['comp_xs'].append(env.x_bnds.copy())
+            bk['comp_ys'].append(env.y_bnds.copy())
 
         goal = goal_generator.sample_goal()
         comp = env.episode(goal)
@@ -131,12 +131,13 @@ def test_interest_gmm(env, nb_episodes, gif=True):
         rewards.append(comp)
     if gif:
         gmm_plot_gif(bk, gifname='gmm'+str(time.time()), gifdir='gifs/')
+    return env.get_score()
 
 def test_CMAES(env, nb_episodes, gif=True):
     print("cmaes run")
     pop_s = 250
-    goal_generator = InterestCMAES(2, popsize=pop_s, sigma_init=0.25)
-    bk = {'covariances': [], 'means': [], 'goals': [], 'episodes': [], 'interests':[]}
+    goal_generator = InterestCMAES(2, popsize=pop_s, sigma_init=0.5)
+    bk = {'covariances': [], 'means': [], 'goals': [], 'episodes': [], 'interests':[], 'sigmas':[]}
     for i in range(nb_episodes):
         if (i % 500) == 0:
             print(env.cell_competence)
@@ -148,6 +149,7 @@ def test_CMAES(env, nb_episodes, gif=True):
             bk['covariances'].append(goal_generator.es.C.copy())
             bk['means'].append(goal_generator.es.mean.copy())
             bk['episodes'].append(i)
+            bk['sigmas'].append(goal_generator.es.sigma)
             # plot_cmaes(bk['means'][-1],
             #          bk['covariances'][-1],
             #          bk['interests'],
@@ -163,24 +165,50 @@ def test_CMAES(env, nb_episodes, gif=True):
         bk['goals'].append(goal.copy())
     if gif:
         cmaes_plot_gif(bk, gifname='cmaes' + str(time.time()), gifdir='gifs/')
+    return env.get_score()
 
 
-def test_random(env, nb_episodes):
+def test_random(env, nb_episodes, gif=False):
     for i in range(nb_episodes):
         if (i % 1000) == 0:
             print(env.cell_competence)
         p = np.random.random(2)
         env.episode(p)
+    return env.get_score()
 
 
 
 if __name__=="__main__":
-    nb_episodes = 30000
-    env = DummyEnv()
-    #test_sagg_iac(env, nb_episodes,gif=False)
-    #test_interest_gmm(env, nb_episodes)
-    test_CMAES(env, nb_episodes)
+    nb_episodes = 20000
+    nb_rand_dims = 10
+    env = DummyEnv(nb_random_dims=nb_rand_dims)
+    #test_sagg_iac(env, nb_episodes,gif=True)
+    test_interest_gmm(env, nb_episodes, nb_dims=2+nb_rand_dims, gif=True)
+    #test_CMAES(env, nb_episodes, gif=True)
     # env = DummyEnv()
-    #test_random(env, nb_episodes)
+    # score = test_random(env, nb_episodes)
+    # print(score)
 
     #env.render()
+
+    #
+    # # Statistical analysis
+    # nb_episodes = 20000
+    # algo_fs = (test_interest_gmm, test_random)
+    # algo_results, algo_times = [[] for _ in range(len(algo_fs))], [[] for _ in range(len(algo_fs))]
+    # for i in range(100):
+    #     for j in range(len(algo_fs)):
+    #         env = DummyEnv()
+    #         start = time.time()
+    #         print(algo_fs[j])
+    #         algo_results[j].append(algo_fs[j](env, nb_episodes, gif=False))
+    #         end = time.time()
+    #         algo_times[j].append(round(end-start))
+    #
+    # # Plot results
+    # for i, (scores, times) in enumerate(zip(algo_results, algo_times)):
+    #     print("Algo:{} \n"
+    #           " scores -> mu:{},sig{},all{}\n"
+    #           " times -> mu:{},sig{}".format(i, np.mean(scores), np.std(scores), scores,
+    #                                          np.mean(times), np.std(times)))
+    #

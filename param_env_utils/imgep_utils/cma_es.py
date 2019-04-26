@@ -17,11 +17,11 @@ class InterestCMAES():
         self.num_params = num_params
         self.sigma_init = sigma_init
         self.popsize = popsize
-        self.es = cma.CMAEvolutionStrategy( self.num_params * [0.1],
+        self.es = cma.CMAEvolutionStrategy( self.num_params * [0.5],
                                             self.sigma_init,
                                             {'popsize': self.popsize,
                                              'CMA_diagonal': 0,
-                                             'CMA_active':False,
+                                             'CMA_active':True,
                                              'bounds':[0,1]})
         self.lp_computer = EmpiricalLearningProgress(num_params)
         self.counter = 0
