@@ -38,7 +38,7 @@ class InterestGMM():
     def __init__(self, mins, maxs, n_components=None, seed=None):
         self.seed = seed
         if not seed:
-            self.seed = np.random.randint(424242)
+            self.seed = np.random.randint(np.random.randint(42,424242))
         self.mins = mins
         self.maxs = maxs
         #self.gmm = GMM(n_components=n_components, covariance_type='full', random_state=self.seed)
@@ -49,15 +49,19 @@ class InterestGMM():
         self.goals_lps = []
         self.fit_rate = 250
         self.nb_random = 250
-        self.random_goal_ratio = 0.2
+        self.random_goal_ratio = 0.1
         self.window = 250
         self.potential_ks = np.arange(1,11,1)
 
-    def update(self, goals, competences):
-        # if not isinstance(competences, list):
-        #     competences = [competences]
-        # if not isinstance(goals[0], list):
-        #     goals = [goals]
+        # boring book-keeping
+        self.bk = {'weights': [], 'covariances': [], 'means': [], 'goals_lps': [], 'episodes': [],
+              'comp_grids': [], 'comp_xs': [], 'comp_ys': []}
+
+    def update(self, goals, competences,all_rewards=None):
+        if not isinstance(competences, list):
+            competences = [competences]
+        if (not isinstance(goals[0], list)) and (not isinstance(goals[0], np.ndarray)):
+            goals = [goals]
         for g, c in zip(goals, competences):
             self.goals.append(g)
             self.lps.append(self.lp_computer.get_lp(g, c))
@@ -76,9 +80,15 @@ class InterestGMM():
                 #plt.plot(self.potential_ks, bics, label='BIC')
                 #plt.show()
                 self.gmm = potential_gmms[np.argmin(bics)]
-                #self.gmm.fit(cur_goals_lps)
 
-    def sample_goal(self, n_samples=1):
+                # book-keeping
+                self.bk['weights'].append(self.gmm.weights_.copy())
+                self.bk['covariances'].append(self.gmm.covariances_.copy())
+                self.bk['means'].append(self.gmm.means_.copy())
+                self.bk['goals_lps'].extend(np.array(self.goals_lps.copy()))
+                self.bk['episodes'].append(len(self.goals))
+
+    def sample_goal(self, kwargs=None, n_samples=1):
         new_goals = []
         if (len(self.goals) < self.nb_random) or (np.random.random() < self.random_goal_ratio):  # random goals until enough data is collected
             new_goals = [self.random_goal_generator.sample() for _ in range(n_samples)]
@@ -90,15 +100,20 @@ class InterestGMM():
                 self.lp_stds.append(covar[-1,-1])
             for _ in range(n_samples):
                 # sample gaussian
-                idx = proportional_choice(self.lp_means, eps=0.2)
+                idx = proportional_choice(self.lp_means, eps=0.1)
                 # sample goal in gaussian, without forgetting to remove learning progress dimension
                 new_goal = np.random.multivariate_normal(self.gmm.means_[idx], self.gmm.covariances_[idx])[:-1]
                 new_goals.append(np.clip(new_goal, self.mins, self.maxs))
 
         if n_samples == 1:
-            return new_goals[0]
+            return new_goals[0].tolist()
         else:
             return np.array(new_goals)
+
+    def dump(self, dump_dict):
+        dump_dict.update(self.bk)
+        return dump_dict
+
 
 if __name__=="__main__":
     # Generate some data

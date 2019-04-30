@@ -2,6 +2,7 @@ import numpy as np
 import pickle
 import copy
 from param_env_utils.active_goal_sampling import SAGG_RIAC
+from param_env_utils.imgep_utils.gmm import InterestGMM
 
 
 def get_sorted2d_params(v_min, v_max, eps=1e-3):
@@ -109,23 +110,35 @@ class EnvParamsSelector(object):
             self.min_ob_spacing = train_env_kwargs['obstacle_spacing'][0]
             self.max_ob_spacing = train_env_kwargs['obstacle_spacing'][1]
 
+        # figure out parameters boundaries
+        mins, maxs = None, None
+        if (train_env_kwargs['stump_height'] is not None) and (train_env_kwargs['tunnel_height'] is not None):
+            mins = np.array([self.min_stump_height, self.min_tunnel_height])
+            maxs = np.array([self.max_stump_height, self.max_tunnel_height])
+        elif (train_env_kwargs['stump_height'] is not None) and (train_env_kwargs['obstacle_spacing'] is not None):
+            mins = np.array([self.min_stump_height, self.min_ob_spacing])
+            maxs = np.array([self.max_stump_height, self.max_ob_spacing])
+        elif train_env_kwargs['stump_height'] is not None:
+            mins = np.array([self.min_stump_height] * 2)
+            maxs = np.array([self.max_stump_height] * 2)
+        elif train_env_kwargs['tunnel_height'] is not None:
+            mins = np.array([self.min_tunnel_height] * 2)
+            maxs = np.array([self.max_tunnel_height] * 2)
+        else:
+            print('Unknown parameters')
+            raise NotImplementedError
+
+        # setup goals generator
         if env_babbling == 'oracle' or env_babbling == 'random':
             self.goal_generator = BaselineGoalGenerator(env_babbling, self.train_env_kwargs)
-
         elif env_babbling == 'sagg_iac':
-            if (train_env_kwargs['stump_height'] is not None) and (train_env_kwargs['tunnel_height'] is not None):
-                # if multi dim, fix std
-                self.goal_generator = SAGG_RIAC(np.array([self.min_stump_height, self.min_tunnel_height]),
-                                                np.array([self.max_stump_height, self.max_tunnel_height]))
-            elif (train_env_kwargs['stump_height'] is not None) and (train_env_kwargs['obstacle_spacing'] is not None):
-                self.goal_generator = SAGG_RIAC(np.array([self.min_stump_height, self.min_ob_spacing]),
-                                                np.array([self.max_stump_height, self.max_ob_spacing]))
-            elif train_env_kwargs['stump_height'] is not None:
-                self.goal_generator = SAGG_RIAC(np.array([self.min_stump_height]*2),
-                                                np.array([self.max_stump_height]*2))
-            elif train_env_kwargs['tunnel_height'] is not None:
-                self.goal_generator = SAGG_RIAC(np.array([self.min_tunnel_height] * 2),
-                                                np.array([self.max_tunnel_height] * 2))
+            self.goal_generator = SAGG_RIAC(mins, maxs)
+        elif env_babbling == 'gmm':
+            self.goal_generator = InterestGMM(mins, maxs)
+        else:
+            print('Unknown env babbling')
+            raise NotImplementedError
+
 
 
         #data recording
@@ -153,7 +166,7 @@ class EnvParamsSelector(object):
     def record_train_episode(self, reward, ep_len):
         self.env_train_rewards.append(reward)
         self.env_train_len.append(ep_len)
-        if self.env_babbling == 'sagg_iac':
+        if (self.env_babbling == 'sagg_iac') or (self.env_babbling == 'gmm'):
             reward = np.interp(reward, (-200, 300), (0, 1))
             self.env_train_norm_rewards.append(reward)
         self.goal_generator.update(self.get_env_params_vec(self.env_params_train),
@@ -178,20 +191,19 @@ class EnvParamsSelector(object):
 
     def set_env_params(self, env, kwargs):
         params = self.goal_generator.sample_goal(kwargs)
-        #print(params)
-        if self.env_babbling == 'sagg_iac':
-            sag_params = copy.copy(params)
+        if (self.env_babbling == 'sagg_iac') or (self.env_babbling == 'gmm'):
+            algo_params = copy.copy(params)
             params = {'tunnel_height':None, 'stump_height':None, 'obstacle_spacing':None}
             if (kwargs['stump_height'] is not None) and (kwargs['tunnel_height'] is not None):
-                params['stump_height'] = [sag_params[0], 0.3]
-                params['tunnel_height'] = [sag_params[1], 0.3]
+                params['stump_height'] = [algo_params[0], 0.3]
+                params['tunnel_height'] = [algo_params[1], 0.3]
             elif (kwargs['stump_height'] is not None) and (kwargs['obstacle_spacing'] is not None):
-                params['stump_height'] = [sag_params[0], 0.1]
-                params['obstacle_spacing'] = sag_params[1]
+                params['stump_height'] = [algo_params[0], 0.1]
+                params['obstacle_spacing'] = algo_params[1]
             elif kwargs['stump_height'] is not None:
-                params['stump_height'] = sag_params
+                params['stump_height'] = algo_params
             elif kwargs['tunnel_height'] is not None:
-                params['tunnel_height'] = sag_params
+                params['tunnel_height'] = algo_params
             else:
                 raise NotImplementedError
         self.env_params_train['stump_hs'].append(params['stump_height'])
