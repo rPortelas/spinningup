@@ -103,6 +103,9 @@ class EnvParamsSelector(object):
         if train_env_kwargs['stump_height'] is not None:
             self.min_stump_height = train_env_kwargs['stump_height'][0]
             self.max_stump_height = train_env_kwargs['stump_height'][1]
+        if train_env_kwargs['stump_width'] is not None:
+            self.min_stump_width = train_env_kwargs['stump_width'][0]
+            self.max_stump_width = train_env_kwargs['stump_width'][1]
         if train_env_kwargs['tunnel_height'] is not None:
             self.min_tunnel_height = train_env_kwargs['tunnel_height'][0]
             self.max_tunnel_height = train_env_kwargs['tunnel_height'][1]
@@ -115,6 +118,11 @@ class EnvParamsSelector(object):
         if (train_env_kwargs['stump_height'] is not None) and (train_env_kwargs['tunnel_height'] is not None):
             mins = np.array([self.min_stump_height, self.min_tunnel_height])
             maxs = np.array([self.max_stump_height, self.max_tunnel_height])
+        elif (train_env_kwargs['stump_height'] is not None) \
+                and (train_env_kwargs['obstacle_spacing'] is not None)\
+                and (train_env_kwargs['stump_width'] is not None):
+            mins = np.array([self.min_stump_height, self.min_stump_width, self.min_ob_spacing])
+            maxs = np.array([self.max_stump_height, self.max_stump_width, self.max_ob_spacing])
         elif (train_env_kwargs['stump_height'] is not None) and (train_env_kwargs['obstacle_spacing'] is not None):
             mins = np.array([self.min_stump_height, self.min_ob_spacing])
             maxs = np.array([self.max_stump_height, self.max_ob_spacing])
@@ -142,12 +150,12 @@ class EnvParamsSelector(object):
 
 
         #data recording
-        self.env_params_train = {'stump_hs':[], 'tunnel_hs':[], 'ob_sps':[]}
+        self.env_params_train = {'stump_hs':[], 'stump_ws':[], 'tunnel_hs':[], 'ob_sps':[]}
         self.env_train_rewards = []
         self.env_train_norm_rewards = []
         self.env_train_len = []
 
-        self.env_params_test = {'stump_hs':[], 'tunnel_hs':[], 'ob_sps':[]}
+        self.env_params_test = {'stump_hs':[], 'stump_ws':[], 'tunnel_hs':[], 'ob_sps':[]}
         self.env_test_rewards = []
         self.env_test_len = []
 
@@ -155,12 +163,18 @@ class EnvParamsSelector(object):
         params = []
         if all_env_params['stump_hs'][-1] is not None:
             params += all_env_params['stump_hs'][-1]
+        if all_env_params['stump_ws'][-1] is not None:
+            params += all_env_params['stump_ws'][-1]
         if all_env_params['tunnel_hs'][-1] is not None:
             params += all_env_params['tunnel_hs'][-1]
         if (all_env_params['stump_hs'][-1] is not None) and (all_env_params['tunnel_hs'][-1] is not None):
             params = [all_env_params['stump_hs'][-1][0], all_env_params['tunnel_hs'][-1][0]]
         if (all_env_params['stump_hs'][-1] is not None) and (all_env_params['ob_sps'][-1] is not None):
             params = [all_env_params['stump_hs'][-1][0], all_env_params['ob_sps'][-1]]
+        if (all_env_params['stump_hs'][-1] is not None) \
+            and (all_env_params['stump_ws'][-1] is not None) \
+            and (all_env_params['ob_sps'][-1] is not None):
+            params = [all_env_params['stump_hs'][-1][0], all_env_params['stump_ws'][-1][0], all_env_params['ob_sps'][-1]]
         return np.array(params)
 
     def record_train_episode(self, reward, ep_len):
@@ -193,10 +207,14 @@ class EnvParamsSelector(object):
         params = self.goal_generator.sample_goal(kwargs)
         if (self.env_babbling == 'sagg_iac') or (self.env_babbling == 'gmm'):
             algo_params = copy.copy(params)
-            params = {'tunnel_height':None, 'stump_height':None, 'obstacle_spacing':None}
+            params = {'tunnel_height':None, 'stump_height':None, 'stump_width':None, 'obstacle_spacing':None}
             if (kwargs['stump_height'] is not None) and (kwargs['tunnel_height'] is not None):
                 params['stump_height'] = [algo_params[0], 0.3]
                 params['tunnel_height'] = [algo_params[1], 0.3]
+            elif (kwargs['stump_height'] is not None) and (kwargs['obstacle_spacing'] is not None) and (kwargs['stump_width'] is not None):
+                params['stump_height'] = [algo_params[0], 0.1]
+                params['stump_width'] = [algo_params[1], 0.1]
+                params['obstacle_spacing'] = algo_params[2]
             elif (kwargs['stump_height'] is not None) and (kwargs['obstacle_spacing'] is not None):
                 params['stump_height'] = [algo_params[0], 0.1]
                 params['obstacle_spacing'] = algo_params[1]
@@ -207,10 +225,11 @@ class EnvParamsSelector(object):
             else:
                 raise NotImplementedError
         self.env_params_train['stump_hs'].append(params['stump_height'])
+        self.env_params_train['stump_ws'].append(params['stump_width'])
         self.env_params_train['tunnel_hs'].append(params['tunnel_height'])
         self.env_params_train['ob_sps'].append(params['obstacle_spacing'])
         env.env.set_environment(roughness=kwargs['roughness'], stump_height=params['stump_height'],
-                                obstacle_spacing=params['obstacle_spacing'],
+                                stump_width=params['stump_width'], obstacle_spacing=params['obstacle_spacing'],
                                 tunnel_height=params['tunnel_height'],
                                 gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
                                 step_number=kwargs['step_number'], env_param_input=kwargs['env_param_input'])
@@ -223,6 +242,7 @@ class EnvParamsSelector(object):
         epsilon = 1e-03
         random_stump_h = None
         random_tunnel_h = None
+        random_stump_w = None
         random_ob_spacing = None
         test_mode = "levels"
         if test_mode == "random":
@@ -242,16 +262,21 @@ class EnvParamsSelector(object):
             #     pass
             if kwargs['stump_height'] is not None:
                 max_stump_height = kwargs['stump_height'][1]
-                stump_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
-                random_stump_h = get_mu_sigma(stump_levels[current_level][0], stump_levels[current_level][1])
-                random_stump_h[1] = 0.3
+                stumph_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
+                random_stump_h = get_mu_sigma(stumph_levels[current_level][0], stumph_levels[current_level][1])
+                random_stump_h[1] = 0.1
+            if kwargs['stump_width'] is not None:
+                max_stump_width = kwargs['stump_width'][1]
+                stumpw_levels = [[0.5, 1.0], [1.0, 1.5], [1.5, 2.]]
+                random_stump_w = get_mu_sigma(stumpw_levels[current_level][0], stumpw_levels[current_level][1])
+                random_stump_w[1] = 0.1
             if kwargs['tunnel_height'] is not None:
                 max_tunnel_height = kwargs['tunnel_height'][1]
                 assert(max_tunnel_height == 2)
                 tunnel_levels = [[1.0, 1.3], [1.3, 1.6], [1.6, 1.9]]
                 tunnel_levels.reverse() #shorter is harder
                 random_tunnel_h = get_mu_sigma(tunnel_levels[current_level][0], tunnel_levels[current_level][1])
-                random_tunnel_h[1] = 0.3
+                random_tunnel_h[1] = 0.1
             if kwargs['obstacle_spacing'] is not None:
                 spacing_levels = [[5, 8], [2, 5], [0, 2]]
                 random_ob_spacing = get_mu_sigma(spacing_levels[current_level][0], spacing_levels[current_level][1])[0]
@@ -262,9 +287,10 @@ class EnvParamsSelector(object):
 
 
         self.env_params_test['stump_hs'].append(random_stump_h)
+        self.env_params_test['stump_ws'].append(random_stump_w)
         self.env_params_test['tunnel_hs'].append(random_tunnel_h)
         self.env_params_test['ob_sps'].append(random_ob_spacing)
-        test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_h,
+        test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_h, stump_width=random_stump_w,
                                      tunnel_height=random_tunnel_h, obstacle_spacing=random_ob_spacing,
                                      gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
                                      step_number=kwargs['step_number'], env_param_input=kwargs['env_param_input'])
