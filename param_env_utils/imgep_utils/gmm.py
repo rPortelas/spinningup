@@ -85,7 +85,7 @@ class InterestGMM():
                 self.bk['weights'].append(self.gmm.weights_.copy())
                 self.bk['covariances'].append(self.gmm.covariances_.copy())
                 self.bk['means'].append(self.gmm.means_.copy())
-                self.bk['goals_lps'].extend(np.array(self.goals_lps.copy()))
+                self.bk['goals_lps'] = self.goals_lps
                 self.bk['episodes'].append(len(self.goals))
 
     def sample_goal(self, kwargs=None, n_samples=1):
