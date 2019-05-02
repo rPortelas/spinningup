@@ -7,34 +7,36 @@ from param_env_utils.imgep_utils.gmm import InterestGMM
 from param_env_utils.imgep_utils.cma_es import InterestCMAES
 from param_env_utils.imgep_utils.plot_utils import cmaes_plot_gif,region_plot_gif, plot_gmm,\
     gmm_plot_gif, plot_cmaes
+import pickle
 import copy
-import cProfile
+import sys
 
 class NDummyEnv(object):  # n-dimensional grid
-    def __init__(self, nb_cells=5, ndims=2):
+    def __init__(self, nb_cells=10, ndims=2, noise=0.0, nb_rand_dims=0):
         self.nb_cells = nb_cells
         self.step_size = 1/nb_cells
         self.bnds = [np.arange(0,1+self.step_size,self.step_size) for i in range(ndims)]
         self.points = []
         self.cell_counts = np.zeros((nb_cells, ) * ndims)
         self.cell_competence = self.cell_counts.copy()
-        self.noise = 0.0
+        self.noise = noise
         self.max_per_cell = 100
-        self.nb_random_dims = 0
-        self.ndims = ndims + self.nb_random_dims
+        self.nb_random_dims = nb_rand_dims
+        self.ndims = ndims
+        self.all_ndims = ndims + self.nb_random_dims
 
     def get_score(self):
         score = np.where(self.cell_competence > (3*(self.max_per_cell/4)))
         return len(score[0])
 
     def episode(self, point):
-        assert(len(point) == self.ndims)
+        assert(len(point) == self.all_ndims)
         for v in point:
             if (v < 0.0) or (v > 1.0):
                 print("OUT OF BOUNDS")
                 self.points.append(point)
                 return 0.
-        pts = point
+        pts = point[0:self.ndims]  # discard random dimensions
         self.points.append(pts)
         # find in which cell pts falls and add to total cell counts
         arr_pts = np.array([pts])
@@ -66,90 +68,23 @@ class NDummyEnv(object):  # n-dimensional grid
             normalized_competence = np.clip(normalized_competence + np.random.normal(0,self.noise), 0, 1)
         return normalized_competence
 
-
-class DummyEnv(object):
-    def __init__(self, nb_cells=10, nb_random_dims=0):
-        self.nb_cells = nb_cells
-        self.step_size = 1/nb_cells
-        self.x_bnds = np.arange(0,1+self.step_size,self.step_size)
-        self.y_bnds = np.arange(0, 1 + self.step_size, self.step_size)
-        self.points = []
-        self.cell_counts = np.zeros((len(self.x_bnds)-1, len(self.y_bnds)-1))
-        self.cell_competence = self.cell_counts.copy()
-        self.noise = 0.2
-        self.max_per_cell = 100
-        self.nb_random_dims = nb_random_dims
-        self.ndims = 2 + self.nb_random_dims
-
-    def get_score(self):
-        score = np.where(self.cell_competence > (3*(self.max_per_cell/4)))
-        return len(score[0])
-
-    def episode(self, point):
-        assert(len(point) == self.ndims)
-        pts = point[0:2]
-        if (pts[0] < 0.0) or (pts[1] < 0.0) or (pts[1] > 1.0) or (pts[0] > 1.0):
-            print("OUT OF BOUNDS")
-            self.points.append(pts)
-            return 0.
-
-        self.points.append(pts)
-        # find in which cell pts falls and add to total cell counts
-        cells = sp.binned_statistic_2d([pts[0]], [pts[1]], None, 'count',
-                                bins=[self.x_bnds, self.y_bnds]).statistic
-        self.cell_counts += cells
-        cell_x, cell_y = cells.nonzero()
-        # find index of "previous" adjacent cells
-        prev_xs = [cell_x, max(0,cell_x - 1)]
-        prev_ys = [cell_y, max(0,cell_y - 1)]
-        if prev_xs[1] == 0 and prev_ys[0] == 0:
-            # root cell
-            self.cell_competence[cell_x, cell_y] = min(self.cell_competence[cell_x, cell_y] + 1, self.max_per_cell)
-        else:
-            competence_added = False
-            for x in prev_xs:
-                for y in prev_ys:
-                    if x == cell_x and y == cell_y: # current cell
-                        continue
-                    else:
-                        if self.cell_competence[x, y] >= (3*(self.max_per_cell/4)):
-                            self.cell_competence[cell_x, cell_y] = min(self.cell_competence[cell_x, cell_y] + 1, self.max_per_cell)
-                            competence_added = True
-                            break
-                if competence_added:
-                    break
-
-        normalized_competence = np.interp(self.cell_competence[cell_x, cell_y], (0, self.max_per_cell), (0, 1))
-        if self.noise >= 0.0:
-            normalized_competence = np.clip(normalized_competence + np.random.normal(0,self.noise), 0, 1)
-        return normalized_competence[0]
-        #print(self.cell_counts[0, 0])
-        #print(self.cell_counts)
-        #print(np.sum(self.cell_counts))
-
-        # compute competence return
-
-
-    def render(self):
-        points = np.array(self.points)
-        plt.plot(points[:,0], points[:,1], 'r.')
-        plt.xlim(left=0, right=1)
-        plt.ylim(bottom=0,top=1)
-        plt.show()
-
-def test_sagg_iac(env, nb_episodes, gif=True, nb_dims=2):
-    goal_generator = SAGG_RIAC(np.array([0.0]*nb_dims),
-                                    np.array([1.0]*nb_dims), temperature=20)
+def test_sagg_iac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
+    goal_generator = SAGG_RIAC(np.array([0.0]*ndims),
+                                    np.array([1.0]*ndims), temperature=20)
     all_boxes = []
     iterations = []
     interests = []
     rewards = []
-    for i in range(nb_episodes):
-        if (i % 1000) == 0:
-            if nb_dims == 2:
-                print(env.cell_competence)
+    scores = []
+    for i in range(nb_episodes+1):
+        if (i % score_step) == 0:
+            scores.append(env.get_score())
+            if ndims == 2:
+                if verbose:
+                    print(env.cell_competence)
             else:
-                print(env.get_score())
+                if verbose:
+                    print(scores[-1])
         goal = goal_generator.sample_goal(None)
         comp = env.episode(goal)
         split, _ = goal_generator.update(np.array(goal), comp, None)
@@ -166,20 +101,23 @@ def test_sagg_iac(env, nb_episodes, gif=True, nb_dims=2):
     if gif:
         region_plot_gif(all_boxes, interests, iterations, goal_generator.sampled_goals,
                         gifname='dummysagg', ep_len=[1]*nb_episodes, rewards=rewards, gifdir='gifs/')
-    return env.get_score()
+    return scores
 
-def test_interest_gmm(env, nb_episodes, gif=True, nb_dims=2):
-    goal_generator = InterestGMM([0]*nb_dims, [1]*nb_dims)
+def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
+    goal_generator = InterestGMM([0]*ndims, [1]*ndims)
     rewards = []
+    scores = []
     bk = {'weights':[], 'covariances':[], 'means':[], 'goals_lps':[], 'episodes':[],
           'comp_grids':[], 'comp_xs':[], 'comp_ys':[]}
-    for i in range(nb_episodes):
-        if (i % 1000) == 0:
+    for i in range(nb_episodes+1):
+        if (i % score_step) == 0:
+            scores.append(env.get_score())
             if ndims == 2:
-                print(env.cell_competence)
-                print(env.get_score())
+                if verbose:
+                    print(env.cell_competence)
             else:
-                print(env.get_score())
+                if verbose:
+                    print(scores[-1])
         if i>100 and (i % goal_generator.fit_rate) == 0:
             bk['weights'].append(goal_generator.gmm.weights_.copy())
             bk['covariances'].append(goal_generator.gmm.covariances_.copy())
@@ -197,14 +135,15 @@ def test_interest_gmm(env, nb_episodes, gif=True, nb_dims=2):
         rewards.append(comp)
     if gif:
         gmm_plot_gif(bk, gifname='gmm'+str(time.time()), gifdir='gifs/')
-    return env.get_score()
+    # final eval
+    return scores
 
-def test_CMAES(env, nb_episodes, gif=True):
+def test_CMAES(env, nb_episodes, gif=True, score_step=1000):
     print("cmaes run")
     pop_s = 250
     goal_generator = InterestCMAES(2, popsize=pop_s, sigma_init=0.5)
     bk = {'covariances': [], 'means': [], 'goals': [], 'episodes': [], 'interests':[], 'sigmas':[]}
-    for i in range(nb_episodes):
+    for i in range(nb_episodes+1):
         if (i % 1000) == 0:
             if ndims == 2:
                 print(env.cell_competence)
@@ -237,55 +176,116 @@ def test_CMAES(env, nb_episodes, gif=True):
     return env.get_score()
 
 
-def test_random(env, nb_episodes, ndims=2, gif=False):
-    for i in range(nb_episodes):
-        if (i % 1000) == 0:
+def test_random(env, nb_episodes, ndims=2, gif=False, score_step=1000, verbose=True):
+    scores = []
+    for i in range(nb_episodes+1):
+        if (i % score_step) == 0:
+            scores.append(env.get_score())
             if ndims == 2:
-                print(env.cell_competence)
+                if verbose:
+                    print(env.cell_competence)
             else:
-                print(env.get_score())
+                if verbose:
+                    print(scores[-1])
         p = np.random.random(ndims)
         env.episode(p)
-    return env.get_score()
+    return scores
+
+
+def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=(test_sagg_iac, test_interest_gmm),
+              nb_seeds=100, noise=0.0, nb_cells=10, id="test"):
+    print("starting stats on {}".format(id))
+    algo_results, algo_times = [[] for _ in range(len(algo_fs))], [[] for _ in range(len(algo_fs))]
+    for i in range(nb_seeds):
+        for j in range(len(algo_fs)):
+            env = NDummyEnv(nb_rand_dims=nb_rand_dims, noise=noise, nb_cells=nb_cells)
+            start = time.time()
+            algo_results[j].append(algo_fs[j](env, nb_episodes, ndims=2+nb_rand_dims, gif=False, verbose=False))
+            end = time.time()
+            algo_times[j].append(round(end-start))
+
+    # Plot results
+    for i, (scores, times) in enumerate(zip(algo_results, algo_times)):
+        print("Algo:{} \n"
+              " scores -> mu:{},sig{},all{}\n"
+              " times -> mu:{},sig{}".format(i, np.mean(scores,axis=0)[-1], np.std(scores, axis=0)[-1], scores,
+                                             np.mean(times), np.std(times)))
+
+    data = [algo_results, algo_times, [str(f).split(" ")[1] for f in algo_fs], nb_episodes]
+    pickle.dump(data, open("dummy_env_save_{}.pkl".format(id), "wb"))
+
+def load_stats(id="test"):
+    scores, times, names, nb_episodes = pickle.load(open("dummy_env_save_{}.pkl".format(id), "rb"))
+
+    ax = plt.gca()
+    colors = ['red','blue','green']
+    legend = True
+    for i, algo_scores in enumerate(scores):
+        print(names[i])
+        ys = algo_scores
+        median = np.median(np.array(ys), axis=0)
+        # print(median)
+        for k, y in enumerate(ys):
+            # print("max:{} last:{}".format(max(y), y[-1]))
+            ax.plot(np.arange(0,nb_episodes+1000,1000), y, color=colors[i], linewidth=0.9, alpha=0.2)
+        ax.plot(np.arange(0,nb_episodes+1000,1000), median, color=colors[i], linewidth=5, label=names[i])
+        ax.set_xlabel('steps', fontsize=18)
+        ax.set_ylabel('Evaluation return', fontsize=18)
+        ax.set_xlim(xmin=0, xmax=nb_episodes)
+        if legend:
+            leg = ax.legend(loc='bottom right', fontsize=14)
+        ax.set_title("testyyyy", fontsize=22)
+
+        print("Algo:{} \n"
+              "times -> mu:{},sig{}".format(i, np.mean(times[i]), np.std(times[i])))
+    plt.show()
 
 
 
 if __name__=="__main__":
-    cp = cProfile.Profile()
-    cp.enable()
-    nb_episodes = 20000
-    nb_rand_dims = 0
-    ndims = 3
-    env = NDummyEnv(ndims=ndims)
-    test_sagg_iac(env, nb_episodes, nb_dims=ndims, gif=False)
-    #test_interest_gmm(env, nb_episodes, nb_dims=ndims, gif=False)
-    #test_CMAES(env, nb_episodes, gif=True)
-    # env = DummyEnv()
-    #score = test_random(env, nb_episodes, ndims=ndims)
-    # print(score)
-    # cp.disable()
-    # cp.dump_stats("test.cprof")
-    #env.render()
-    #
-
-    # # Statistical analysis
     # nb_episodes = 20000
-    # nb_rand_dims = 0
-    # algo_fs = (test_sagg_iac, test_interest_gmm)
-    # algo_results, algo_times = [[] for _ in range(len(algo_fs))], [[] for _ in range(len(algo_fs))]
-    # for i in range(100):
-    #     for j in range(len(algo_fs)):
-    #         env = DummyEnv(nb_random_dims=nb_rand_dims)
-    #         start = time.time()
-    #         print(algo_fs[j])
-    #         algo_results[j].append(algo_fs[j](env, nb_episodes, nb_dims=2+nb_rand_dims, gif=False))
-    #         end = time.time()
-    #         algo_times[j].append(round(end-start))
+    # nb_rand_dims = 10
+    # ndims = 2
+    # env = NDummyEnv(ndims=ndims, nb_rand_dims=nb_rand_dims)
+    # test_interest_gmm(env, nb_episodes, ndims=ndims+nb_rand_dims, gif=False)
+    # #test_CMAES(env, nb_episodes, gif=True)
+    # # env = DummyEnv()
+    # #score = test_random(env, nb_episodes, ndims=ndims)
+    # # print(score)
+    # #env.render()
+    # #
+    nb_eps = 100000
+    nb_seeds = 10
+    algos = (test_sagg_iac, test_interest_gmm, test_random)
+    exp_args = [{"id":"2d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
+                {"id":"2dnoise", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "noise":0.2},
+                {"id":"2d5rd", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "nb_rand_dims":5},
+                {"id":"2d10rd", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "nb_rand_dims":10},
+                {"id":"3d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3},
+                {"id":"4d5cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":4, "nb_cells":5},
+                {"id":"5d4cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_cells":4},
+                {"id":"5d10rd4cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_rand_dims":10, "nb_cells":4}]
+
+    print("launching expe" + sys.argv[1])
+    if len(sys.argv) != 2:
+        print('launching all experiences')
+        exp_nbs = np.arange(0,len(exp_args))
+    elif int(sys.argv[1]) >= len(exp_args):
+        print(sys.argv[1]+": not an expe")
+        exit(0)
+    else:
+        exp_nbs = [int(sys.argv[1])]
+    ## run_stats(id="2d", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds)
+    # run_stats(id="2dnoise", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, noise=0.2)
+    # run_stats(id="2d5rd", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, nb_rand_dims=5)
+    # run_stats(id="2d10rd", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, nb_rand_dims=10)
     #
-    # # Plot results
-    # for i, (scores, times) in enumerate(zip(algo_results, algo_times)):
-    #     print("Algo:{} \n"
-    #           " scores -> mu:{},sig{},all{}\n"
-    #           " times -> mu:{},sig{}".format(i, np.mean(scores), np.std(scores), scores,
-    #                                          np.mean(times), np.std(times)))
-    #
+    # run_stats(id="3d", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=3)
+    # run_stats(id="4d5cells", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=4, nb_cells=5)
+    # run_stats(id="5d4cells", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=5, nb_cells=4)
+    # run_stats(id="5d10rd4cells", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=5, nb_rand_dims=10, nb_cells=4)
+
+
+    #load_stats(id="2dnoise")
+    for i in exp_nbs:
+        run_stats(**exp_args[i])
