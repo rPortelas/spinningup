@@ -199,9 +199,9 @@ def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=(test_sagg_i
     names = [str(f).split(" ")[1] for f in algo_fs]
     for i in range(nb_seeds):
         for j in range(len(algo_fs)):
-            env = NDummyEnv(nb_rand_dims=nb_rand_dims, noise=noise, nb_cells=nb_cells)
+            env = NDummyEnv(ndims=ndims, nb_rand_dims=nb_rand_dims, noise=noise, nb_cells=nb_cells)
             start = time.time()
-            algo_results[j].append(algo_fs[j](env, nb_episodes, ndims=2+nb_rand_dims, gif=False, verbose=False))
+            algo_results[j].append(algo_fs[j](env, nb_episodes, ndims=ndims+nb_rand_dims, gif=False, verbose=True))
             end = time.time()
             algo_times[j].append(round(end-start))
 
@@ -214,9 +214,9 @@ def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=(test_sagg_i
     data = [algo_results, algo_times, names, nb_episodes]
     pickle.dump(data, open("dummy_env_save_{}.pkl".format(id), "wb"))
 
-def load_stats(id="test"):
+def load_stats(id="test",fnum=0):
     scores, times, names, nb_episodes = pickle.load(open("dummy_env_save_{}.pkl".format(id), "rb"))
-
+    plt.figure(fnum)
     ax = plt.gca()
     colors = ['red','blue','green']
     legend = True
@@ -234,11 +234,11 @@ def load_stats(id="test"):
         ax.set_xlim(xmin=0, xmax=nb_episodes)
         if legend:
             leg = ax.legend(loc='bottom right', fontsize=14)
-        ax.set_title("testyyyy", fontsize=22)
+        ax.set_title(id, fontsize=22)
 
         print("Algo:{} \n"
               "times -> mu:{},sig{}".format(i, np.mean(times[i]), np.std(times[i])))
-    plt.show()
+    plt.savefig(id+'.png')
 
 
 
@@ -255,17 +255,18 @@ if __name__=="__main__":
     # #env.render()
     # #
     nb_eps = 100000
-    nb_seeds = 100
+    nb_seeds = 50
     algos = (test_sagg_iac, test_interest_gmm, test_random)
     exp_args = [{"id":"2d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
-                {"id":"2dnoise", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "noise":0.2},
+                {"id":"2dnoise01", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "noise":0.1},
+                {"id": "2dnoise005", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "noise": 0.05},
                 {"id":"2d2rd", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "nb_rand_dims":2},
                 {"id":"2d5rd", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "nb_rand_dims":5},
                 {"id":"3d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3},
                 {"id":"4d5cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":4, "nb_cells":5},
                 {"id":"5d4cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_cells":4},
                 {"id":"5d5rd4cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_rand_dims":5, "nb_cells":4}]
-
+    #exp_args = [{"id":"4d5cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":4, "nb_cells":5}]
     if len(sys.argv) != 2:
         print('launching all experiences')
         exp_nbs = np.arange(0,len(exp_args))
@@ -285,7 +286,15 @@ if __name__=="__main__":
     # run_stats(id="5d4cells", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=5, nb_cells=4)
     # run_stats(id="5d10rd4cells", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=5, nb_rand_dims=10, nb_cells=4)
 
-
-    #load_stats(id="2dnoise")
     for i in exp_nbs:
-        run_stats(**exp_args[i])
+         run_stats(**exp_args[i])
+    #
+    #
+    # # Display all stats
+    # all_ids = []
+    # for i,exp in enumerate(exp_args):
+    #     all_ids.append(exp["id"])
+    #     load_stats(all_ids[-1], fnum=i)
+    # plt.show()
+    #
+    #

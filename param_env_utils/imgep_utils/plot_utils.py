@@ -124,6 +124,11 @@ def draw_ellipse(position, covariance, ax=None, **kwargs):
 def draw_competence_grid(ax, comp_grid, x_bnds, y_bnds):
     ax.pcolor(x_bnds, y_bnds, np.transpose(comp_grid),cmap=plt.cm.gray, edgecolors='k', linewidths=2,
               alpha=0.3)
+    cax, _ = cbar.make_axes(ax,location='left')
+    cb = cbar.ColorbarBase(cax, cmap=plt.cm.gray)
+    cb.set_label('Competence')
+    cax.yaxis.set_ticks_position('left')
+    cax.yaxis.set_label_position('left')
 
 def plot_gmm(weights, means, covariances, X, ax=None, xlim=[0,1], ylim=[0,1], xlabel='jkl', ylabel='jhgj'):
     ax = ax or plt.gca()
@@ -138,19 +143,12 @@ def plot_gmm(weights, means, covariances, X, ax=None, xlim=[0,1], ylim=[0,1], xl
     cb = cbar.ColorbarBase(cax, cmap=plt.cm.jet)
     cb.set_label('Interest')
 
-    cax, _ = cbar.make_axes(ax,location='left')
-    cb = cbar.ColorbarBase(cax, cmap=plt.cm.gray)
-    cb.set_label('Competence')
-    cax.yaxis.set_ticks_position('left')
-    cax.yaxis.set_label_position('left')
-
     ax.axis('equal')
     ax.set_xlim(left=xlim[0], right=xlim[1])
     ax.set_ylim(bottom=ylim[0], top=ylim[1])
 
-def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None):
+def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None, xlim=[0,1], ylim=[0,1], fig_size=(10,6)):
     plt.ioff()
-    print("Making an exploration GIF: " + gifname)
     # Create target Directory if don't exist
     tmpdir = 'tmp/'
     tmppath = gifdir + 'tmp/'
@@ -159,15 +157,16 @@ def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None):
         print("Directory ", tmppath, " Created ")
     else:
         print("Directory ", tmppath, " already exists")
+    print("Making " + tmppath + gifname + ".gif")
     images = []
     old_ep = 0
-    for ws, covs, means, gs_lps, ep, c_grid, c_xs, c_ys in \
-            zip(bk['weights'], bk['covariances'], bk['means'], bk['goals_lps'], bk['episodes'],
-                bk['comp_grids'], bk['comp_xs'], bk['comp_ys']):
-            plt.figure(figsize=(10,6))
+    gs_lps = bk['goals_lps']
+    for i,(ws, covs, means, ep) in enumerate(zip(bk['weights'], bk['covariances'], bk['means'], bk['episodes'])):
+            plt.figure(figsize=fig_size)
             ax = plt.gca()
-            plot_gmm(ws, means, covs, gs_lps[old_ep:ep], ax=ax)
-            draw_competence_grid(ax, c_grid, c_xs, c_ys)
+            plot_gmm(ws, means, covs, np.array(gs_lps[old_ep:ep]), ax=ax, xlim=xlim, ylim=ylim)
+            if 'comp_grid' in bk:  # add competence grid info
+                draw_competence_grid(ax,bk['comp_grids'][i], bk['comp_xs'][i], bk['comp_ys'][i])
             f_name = gifdir+tmpdir+"scatter_{}.png".format(ep)
             plt.suptitle('Episode {} | nb gaussians:{}'.format(ep,len(means)), fontsize=20)
             old_ep = ep
