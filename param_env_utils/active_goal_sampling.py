@@ -4,8 +4,8 @@ from collections import deque
 import copy
 
 
-# Implementation of SAGG-RIAC
-class SAGG_RIAC():
+# Implementation of SAGG-IAC
+class SAGG_IAC():
     #min: [-1,-1] max:[1,1]
     def __init__(self, min, max, temperature=20):
 

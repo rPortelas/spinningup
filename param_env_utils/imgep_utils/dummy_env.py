@@ -2,7 +2,8 @@ import numpy as np
 import scipy.stats as sp
 import matplotlib.pyplot as plt
 import time
-from param_env_utils.active_goal_sampling import SAGG_RIAC
+from param_env_utils.active_goal_sampling import SAGG_IAC
+from param_env_utils.imgep_utils.sagg_riac import SAGG_RIAC
 from param_env_utils.imgep_utils.gmm import InterestGMM
 from param_env_utils.imgep_utils.cma_es import InterestCMAES
 from param_env_utils.imgep_utils.plot_utils import cmaes_plot_gif,region_plot_gif, plot_gmm,\
@@ -69,7 +70,7 @@ class NDummyEnv(object):  # n-dimensional grid
         return normalized_competence
 
 def test_sagg_iac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
-    goal_generator = SAGG_RIAC(np.array([0.0]*ndims),
+    goal_generator = SAGG_IAC(np.array([0.0]*ndims),
                                     np.array([1.0]*ndims), temperature=20)
     all_boxes = []
     iterations = []
@@ -103,6 +104,40 @@ def test_sagg_iac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=
                         gifname='dummysagg', ep_len=[1]*nb_episodes, rewards=rewards, gifdir='gifs/')
     return scores
 
+def test_sagg_riac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
+    goal_generator = SAGG_RIAC(np.array([0.0]*ndims),
+                                    np.array([1.0]*ndims), temperature=20)
+    all_boxes = []
+    iterations = []
+    interests = []
+    rewards = []
+    scores = []
+    for i in range(nb_episodes+1):
+        if (i % score_step) == 0:
+            scores.append(env.get_score())
+            if ndims == 2:
+                if verbose:
+                    print(env.cell_competence)
+            else:
+                if verbose:
+                    print(scores[-1])
+        goal = goal_generator.sample_goal(None)
+        comp = env.episode(goal)
+        split, _ = goal_generator.update(np.array(goal), comp, None)
+
+        # book keeping
+        if split:
+            boxes = goal_generator.regions_bounds
+            interest = goal_generator.interest
+            interests.append(copy.copy(interest))
+            iterations.append(i)
+            all_boxes.append(copy.copy(boxes))
+        rewards.append(comp)
+
+    if gif:
+        region_plot_gif(all_boxes, interests, iterations, goal_generator.sampled_goals,
+                        gifname='dummysaggriac', ep_len=[1]*nb_episodes, rewards=rewards, gifdir='gifs/')
+    return scores
 def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
     goal_generator = InterestGMM([0]*ndims, [1]*ndims)
     rewards = []

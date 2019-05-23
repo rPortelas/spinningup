@@ -1,7 +1,7 @@
 import numpy as np
 import pickle
 import copy
-from param_env_utils.active_goal_sampling import SAGG_RIAC
+from param_env_utils.active_goal_sampling import SAGG_IAC
 from param_env_utils.imgep_utils.gmm import InterestGMM
 
 
@@ -140,7 +140,7 @@ class EnvParamsSelector(object):
         if env_babbling == 'oracle' or env_babbling == 'random':
             self.goal_generator = BaselineGoalGenerator(env_babbling, self.train_env_kwargs)
         elif env_babbling == 'sagg_iac':
-            self.goal_generator = SAGG_RIAC(mins, maxs)
+            self.goal_generator = SAGG_IAC(mins, maxs)
         elif env_babbling == 'gmm':
             self.goal_generator = InterestGMM(mins, maxs)
         else:
