@@ -15,6 +15,7 @@ import sys
 class NDummyEnv(object):  # n-dimensional grid
     def __init__(self, nb_cells=10, ndims=2, noise=0.0, nb_rand_dims=0):
         self.nb_cells = nb_cells
+        self.nb_total_cells = nb_cells ** ndims
         self.step_size = 1/nb_cells
         self.bnds = [np.arange(0,1+self.step_size,self.step_size) for i in range(ndims)]
         self.points = []
@@ -28,7 +29,7 @@ class NDummyEnv(object):  # n-dimensional grid
 
     def get_score(self):
         score = np.where(self.cell_competence > (3*(self.max_per_cell/4)))
-        return len(score[0])
+        return (len(score[0]) / self.nb_total_cells)*100
 
     def episode(self, point):
         assert(len(point) == self.all_ndims)
