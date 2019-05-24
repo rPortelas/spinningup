@@ -14,7 +14,7 @@ from param_env_utils.imgep_utils.gep_utils import proportional_choice
 class EmpiricalLearningProgress():
     def __init__(self, goal_size):
         self.interest_knn = BufferedDataset(1, goal_size, buffer_size=500, lateness=0)
-        self.window_size = 1000
+        #self.window_size = 1000
 
     def get_lp(self, goal, competence):
         interest = 0
@@ -41,7 +41,6 @@ class InterestGMM():
             self.seed = np.random.randint(np.random.randint(42,424242))
         self.mins = mins
         self.maxs = maxs
-        #self.gmm = GMM(n_components=n_components, covariance_type='full', random_state=self.seed)
         self.random_goal_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
         self.lp_computer = EmpiricalLearningProgress(len(mins))
         self.goals = []
@@ -113,6 +112,12 @@ class InterestGMM():
     def dump(self, dump_dict):
         dump_dict.update(self.bk)
         return dump_dict
+
+
+
+
+
+
 
 
 if __name__=="__main__":

@@ -159,7 +159,7 @@ class SAGG_RIAC():
         new_split = False
         root = self.tree.get_node('root')
         self.add_goal_comp(root, goal, continuous_competence)
-        print(self.nodes_to_split)
+        #print(self.nodes_to_split)
         assert len(self.nodes_to_split) <= 1
 
         # split a node if needed
@@ -207,8 +207,8 @@ class SAGG_RIAC():
                 worst_goal_idx = np.argmin(self.cps_gs[region_id][0])
                 # mutate goal by a small amount (i.e a gaussian scaled to the regions range)
                 goal = np.random.normal(self.cps_gs[region_id][1][worst_goal_idx].copy(), 0.1)
-                # clip to stay within region
-                goal = np.clip(goal, self.regions_bounds[region_id].low, self.regions_bounds[region_id].high)
+                # clip to stay within region (add small epsilon to avoid falling in multiple regions)
+                goal = np.clip(goal, self.regions_bounds[region_id].low + 1e-5, self.regions_bounds[region_id].high - 1e-5)
                 self.sampled_goals.append(goal)
 
         elif mode < 0.3:  # "mode 2" (20%) -> random goal

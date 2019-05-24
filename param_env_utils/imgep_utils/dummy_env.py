@@ -5,6 +5,7 @@ import time
 from param_env_utils.active_goal_sampling import SAGG_IAC
 from param_env_utils.imgep_utils.sagg_riac import SAGG_RIAC
 from param_env_utils.imgep_utils.gmm import InterestGMM
+from param_env_utils.imgep_utils.baranes_gmm import BaranesGMM
 from param_env_utils.imgep_utils.cma_es import InterestCMAES
 from param_env_utils.imgep_utils.plot_utils import cmaes_plot_gif,region_plot_gif, plot_gmm,\
     gmm_plot_gif, plot_cmaes
@@ -174,6 +175,41 @@ def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verb
     # final eval
     return scores
 
+def test_baranes_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
+    goal_generator = BaranesGMM([0]*ndims, [1]*ndims)
+    rewards = []
+    scores = []
+    bk = {'weights':[], 'covariances':[], 'means':[], 'goals_lps':[], 'episodes':[],
+          'comp_grids':[], 'comp_xs':[], 'comp_ys':[]}
+    for i in range(nb_episodes+1):
+        if (i % score_step) == 0:
+            scores.append(env.get_score())
+            if ndims == 2:
+                if verbose:
+                    print(env.cell_competence)
+            else:
+                if verbose:
+                    print(scores[-1])
+        if i>100 and (i % goal_generator.fit_rate) == 0:
+            bk['weights'].append(goal_generator.gmm.weights_.copy())
+            bk['covariances'].append(goal_generator.gmm.covariances_.copy())
+            bk['means'].append(goal_generator.gmm.means_.copy())
+            bk['goals_lps'].append(np.array(goal_generator.goals_times_comps.copy()))
+            bk['episodes'].append(i)
+            if ndims == 2:
+                bk['comp_grids'].append(env.cell_competence.copy())
+                bk['comp_xs'].append(env.bnds[0].copy())
+                bk['comp_ys'].append(env.bnds[1].copy())
+
+        goal = goal_generator.sample_goal()
+        comp = env.episode(goal)
+        goal_generator.update(np.array(goal), comp)
+        rewards.append(comp)
+    if gif:
+        gmm_plot_gif(bk, gifname='baranesgmm'+str(time.time()), gifdir='gifs/')
+    # final eval
+    return scores
+
 def test_CMAES(env, nb_episodes, gif=True, score_step=1000):
     print("cmaes run")
     pop_s = 250
@@ -237,7 +273,7 @@ def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=(test_sagg_i
         for j in range(len(algo_fs)):
             env = NDummyEnv(ndims=ndims, nb_rand_dims=nb_rand_dims, noise=noise, nb_cells=nb_cells)
             start = time.time()
-            algo_results[j].append(algo_fs[j](env, nb_episodes, ndims=ndims+nb_rand_dims, gif=False, verbose=True))
+            algo_results[j].append(algo_fs[j](env, nb_episodes, ndims=ndims+nb_rand_dims, gif=False, verbose=False))
             end = time.time()
             algo_times[j].append(round(end-start))
 
@@ -290,19 +326,25 @@ if __name__=="__main__":
     # # print(score)
     # #env.render()
     # #
+
     nb_eps = 100000
     nb_seeds = 50
-    algos = (test_sagg_iac, test_interest_gmm, test_random)
+    algos = (test_baranes_gmm, test_sagg_riac, test_sagg_iac, test_interest_gmm, test_random)
     exp_args = [{"id":"2d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
                 {"id":"2dnoise01", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "noise":0.1},
                 {"id": "2dnoise005", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "noise": 0.05},
                 {"id":"2d2rd", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "nb_rand_dims":2},
                 {"id":"2d5rd", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "nb_rand_dims":5},
+                {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10},
                 {"id":"3d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3},
                 {"id":"4d5cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":4, "nb_cells":5},
                 {"id":"5d4cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_cells":4},
+                {"id":"5d7cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_cells":7},
+                {"id": "5d6cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5,"nb_cells":6},
+                {"id": "20d3cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 20,"nb_cells": 3},
+                {"id": "30d3cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 30,"nb_cells": 3},
                 {"id":"5d5rd4cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_rand_dims":5, "nb_cells":4}]
-    #exp_args = [{"id":"4d5cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":4, "nb_cells":5}]
+    #exp_args = [{"id":"3d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3}]
     if len(sys.argv) != 2:
         print('launching all experiences')
         exp_nbs = np.arange(0,len(exp_args))
@@ -312,7 +354,7 @@ if __name__=="__main__":
     else:
         print("launching expe" + sys.argv[1])
         exp_nbs = [int(sys.argv[1])]
-    ## run_stats(id="2d", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds)
+    #run_stats(id="2d", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds)
     # run_stats(id="2dnoise", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, noise=0.2)
     # run_stats(id="2d5rd", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, nb_rand_dims=5)
     # run_stats(id="2d10rd", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, nb_rand_dims=10)
@@ -321,16 +363,16 @@ if __name__=="__main__":
     # run_stats(id="4d5cells", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=4, nb_cells=5)
     # run_stats(id="5d4cells", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=5, nb_cells=4)
     # run_stats(id="5d10rd4cells", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=5, nb_rand_dims=10, nb_cells=4)
-
+    #
     for i in exp_nbs:
          run_stats(**exp_args[i])
     #
     #
-    # # Display all stats
+    # Display all stats
     # all_ids = []
     # for i,exp in enumerate(exp_args):
     #     all_ids.append(exp["id"])
     #     load_stats(all_ids[-1], fnum=i)
     # plt.show()
-    #
+
     #
