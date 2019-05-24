@@ -51,7 +51,7 @@ Soft Actor-Critic
 def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0, 
         steps_per_epoch=100000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-3, alpha=0.005, batch_size=100, start_steps=10000,
-        max_ep_len=2000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict(),
+        max_ep_len=2000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict(), env_init=dict(),
         norm_obs=False, env_name='unknown', nb_test_episodes=15, train_freq=1):
     """
 
@@ -145,6 +145,9 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     env_params = EnvParamsSelector(env_babbling, nb_test_episodes, env_kwargs)
 
     env, test_env = env_fn(), env_fn()
+
+    if len(env_init.items()) > 0:
+        env.env.my_init(env_init)
 
 
     if env_babbling is not "none": env_params.set_env_params(env,env_kwargs)
@@ -386,6 +389,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--train_freq', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=100)
+    parser.add_argument('--leg_size', type=str, default="default")
 
     args = parser.parse_args()
 
@@ -408,11 +412,22 @@ if __name__ == '__main__':
                   'step_height':args.step_h,
                   'step_number':args.step_nb,
                   'env_param_input':args.env_param_input}
-    sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
+    env_f = lambda : gym.make(args.env)
+    env_init = {}
+    if args.env == "flowers-Walker-continuous-v0":
+        if args.leg_size == "short":
+            env_init = {"LEGW":8,"LEGH":17}
+        elif args.leg_size == "long":
+            env_init = {"LEGW": 8, "LEGH": 51}
+        elif args.leg_size == "default":
+            pass
+        else:
+            raise NotImplementedError
+    sac(env_f, actor_critic=core.mlp_actor_critic,
         ac_kwargs=ac_kwargs,
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
         logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
         steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size,
-        env_babbling=args.env_babbling, env_kwargs=env_kwargs, norm_obs=args.norm_obs,
+        env_babbling=args.env_babbling, env_kwargs=env_kwargs, env_init=env_init, norm_obs=args.norm_obs,
         env_name=args.env, nb_test_episodes=args.nb_test_episodes, lr=args.lr, train_freq=args.train_freq,
         batch_size=args.batch_size)
