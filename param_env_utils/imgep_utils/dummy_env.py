@@ -12,6 +12,7 @@ from param_env_utils.imgep_utils.plot_utils import cmaes_plot_gif,region_plot_gi
 import pickle
 import copy
 import sys
+import cProfile
 
 class NDummyEnv(object):  # n-dimensional grid
     def __init__(self, nb_cells=10, ndims=2, noise=0.0, nb_rand_dims=0):
@@ -352,8 +353,9 @@ if __name__=="__main__":
         print(sys.argv[1]+": not an expe")
         exit(0)
     else:
-        print("launching expe" + sys.argv[1])
         exp_nbs = [int(sys.argv[1])]
+        print("launching expe" + sys.argv[1] + " : " + exp_args[exp_nbs[0]]["id"])
+
     #run_stats(id="2d", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds)
     # run_stats(id="2dnoise", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, noise=0.2)
     # run_stats(id="2d5rd", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, nb_rand_dims=5)
