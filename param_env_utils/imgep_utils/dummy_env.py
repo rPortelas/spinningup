@@ -288,10 +288,15 @@ def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=(test_sagg_i
     pickle.dump(data, open("dummy_env_save_{}.pkl".format(id), "wb"))
 
 def load_stats(id="test",fnum=0):
-    scores, times, names, nb_episodes = pickle.load(open("dummy_env_save_{}.pkl".format(id), "rb"))
+    try:
+        scores, times, names, nb_episodes = pickle.load(open("dummy_env_save_{}.pkl".format(id), "rb"))
+    except FileNotFoundError:
+        print('no data for {}'.format(id))
+        return 0
+    names = [n[5:] for n in names]  # remove "test_" from names
     plt.figure(fnum)
     ax = plt.gca()
-    colors = ['red','blue','green']
+    colors = ['red','blue','green','orange','purple']
     legend = True
     for i, algo_scores in enumerate(scores):
         print(names[i])
@@ -302,8 +307,8 @@ def load_stats(id="test",fnum=0):
             # print("max:{} last:{}".format(max(y), y[-1]))
             ax.plot(np.arange(0,nb_episodes+1000,1000), y, color=colors[i], linewidth=0.9, alpha=0.2)
         ax.plot(np.arange(0,nb_episodes+1000,1000), median, color=colors[i], linewidth=5, label=names[i])
-        ax.set_xlabel('steps', fontsize=18)
-        ax.set_ylabel('Evaluation return', fontsize=18)
+        ax.set_xlabel('episodes', fontsize=18)
+        ax.set_ylabel('% mastered cells', fontsize=18)
         ax.set_xlim(xmin=0, xmax=nb_episodes)
         if legend:
             leg = ax.legend(loc='bottom right', fontsize=14)
@@ -330,7 +335,7 @@ if __name__=="__main__":
 
     nb_eps = 100000
     nb_seeds = 50
-    algos = (test_baranes_gmm, test_sagg_riac, test_sagg_iac, test_interest_gmm, test_random)
+    algos = (test_sagg_riac, test_baranes_gmm, test_sagg_iac, test_interest_gmm, test_random)
     exp_args = [{"id":"2d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
                 {"id":"2dnoise01", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "noise":0.1},
                 {"id": "2dnoise005", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "noise": 0.05},
@@ -345,7 +350,7 @@ if __name__=="__main__":
                 {"id": "10d4cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 10, "nb_cells": 4},
                 {"id": "8d4cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 8, "nb_cells": 4},
                 {"id":"5d5rd4cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_rand_dims":5, "nb_cells":4}]
-    #exp_args = [{"id":"3d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3}]
+    #exp_args = [{"id":"2d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":2}]
     if len(sys.argv) != 2:
         print('launching all experiences')
         exp_nbs = np.arange(0,len(exp_args))
@@ -370,7 +375,7 @@ if __name__=="__main__":
          run_stats(**exp_args[i])
     #
     #
-    # Display all stats
+    # #Display all stats
     # all_ids = []
     # for i,exp in enumerate(exp_args):
     #     all_ids.append(exp["id"])

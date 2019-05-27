@@ -4,6 +4,7 @@ from collections import deque
 from param_env_utils.imgep_utils.gep_utils import proportional_choice
 import copy
 from treelib import Tree
+from itertools import islice
 
 class Region(object):
     def __init__(self, maxlen, cps_gs=None, bounds=None, interest=None):
@@ -83,7 +84,7 @@ class SAGG_RIAC():
             sub_reg1 = [deque(maxlen=self.maxlen + 1), deque(maxlen=self.maxlen + 1)]
             sub_reg2 = [deque(maxlen=self.maxlen + 1), deque(maxlen=self.maxlen + 1)]
 
-            # repeat until the two sub regions contain at least 1/4 of the mother region TRICK NB 1
+            # repeat until the two sub regions contain at least minlen of the mother region TRICK NB 1
             while len(sub_reg1[0]) < self.minlen or len(sub_reg2[0]) < self.minlen:
                 # decide on dimension
                 dim = np.random.choice(range(self.nb_dims))
@@ -94,10 +95,10 @@ class SAGG_RIAC():
                 bounds2.low[dim] = threshold
                 bounds = [bounds1, bounds2]
                 valid_bounds = True
-                # if np.any(bounds1.high - bounds1.low < self.init_size / 15):  # to enforce not too small boxes TRICK NB 2
-                #     valid_bounds = False
-                # if np.any(bounds2.high - bounds2.low < self.init_size / 15):
-                #     valid_bounds = valid_bounds and False
+                if np.any(bounds1.high - bounds1.low < self.init_size / 15):  # to enforce not too small boxes TRICK NB 2
+                    valid_bounds = False
+                if np.any(bounds2.high - bounds2.low < self.init_size / 15):
+                    valid_bounds = valid_bounds and False
 
                 # perform split in sub regions
                 sub_reg1 = [deque(maxlen=self.maxlen + 1), deque(maxlen=self.maxlen + 1)]
@@ -131,11 +132,12 @@ class SAGG_RIAC():
                 self.tree.create_node(identifier=self.tree.size(), parent=nid,
                                       data=Region(self.maxlen, cps_gs=cps_gs, bounds=bounds, interest=interest[i]))
         else:
-            # TRICK NB 6, remove old stuff if can't find split TODO may interfere with tree struct
-            reg.cps_gs[0] = reg.cps_gs[0][- int(3 * len(reg.cps_gs[0]) / 4):]
-            reg.cps_gs[1] = reg.cps_gs[1][- int(3 * len(reg.cps_gs[1]) / 4):]
+            #print("abort mission")
+            # TRICK NB 6, remove old stuff if can't find split
+            assert len(reg.cps_gs[0]) == (self.maxlen + 1)
+            reg.cps_gs[0] = deque(islice(reg.cps_gs[0], int(self.maxlen / 4), self.maxlen + 1))
+            reg.cps_gs[1] = deque(islice(reg.cps_gs[1], int(self.maxlen / 4), self.maxlen + 1))
 
-        assert is_split
         return is_split
 
     def add_goal_comp(self, node, goal, comp):
