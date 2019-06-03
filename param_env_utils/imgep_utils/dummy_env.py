@@ -396,8 +396,8 @@ if __name__=="__main__":
     # #
 
     nb_eps = 100000
-    nb_seeds = 5
-    algos = (test_sagg_briac, test_sagg_riac)
+    nb_seeds = 50
+    algos = (test_sagg_riac, test_baranes_gmm, test_interest_gmm, test_random)
     # exp_args = [{"id":"2d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
     #             {"id":"2dnoise01", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "noise":0.1},
     #             {"id": "2dnoise005", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "noise": 0.05},
@@ -433,25 +433,16 @@ if __name__=="__main__":
         exp_nbs = [int(sys.argv[1])]
         print("launching expe" + sys.argv[1] + " : " + exp_args[exp_nbs[0]]["id"])
 
-    #run_stats(id="2d", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds)
-    # run_stats(id="2dnoise", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, noise=0.2)
-    # run_stats(id="2d5rd", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, nb_rand_dims=5)
-    # run_stats(id="2d10rd", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, nb_rand_dims=10)
-    #
-    # run_stats(id="3d", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=3)
-    # run_stats(id="4d5cells", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=4, nb_cells=5)
-    # run_stats(id="5d4cells", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=5, nb_cells=4)
-    # run_stats(id="5d10rd4cells", nb_episodes=nb_eps, algo_fs=algos, nb_seeds=nb_seeds, ndims=5, nb_rand_dims=10, nb_cells=4)
-    # #
-    # for i in exp_nbs:
-    #      run_stats(**exp_args[i])
+
+    for i in exp_nbs:
+         run_stats(**exp_args[i])
 
 
-    #Display all stats
-    all_ids = []
-    for i,exp in enumerate(exp_args):
-        all_ids.append(exp["id"])
-        load_stats(all_ids[-1], fnum=i)
-    plt.show()
+    # #Display all stats
+    # all_ids = []
+    # for i,exp in enumerate(exp_args):
+    #     all_ids.append(exp["id"])
+    #     load_stats(all_ids[-1], fnum=i)
+    # plt.show()
 
     #
