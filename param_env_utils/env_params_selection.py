@@ -2,6 +2,7 @@ import numpy as np
 import pickle
 import copy
 from param_env_utils.active_goal_sampling import SAGG_IAC
+from param_env_utils.imgep_utils.sagg_riac import SAGG_RIAC
 from param_env_utils.imgep_utils.gmm import InterestGMM
 
 
@@ -141,6 +142,8 @@ class EnvParamsSelector(object):
             self.goal_generator = BaselineGoalGenerator(env_babbling, self.train_env_kwargs)
         elif env_babbling == 'sagg_iac':
             self.goal_generator = SAGG_IAC(mins, maxs)
+        elif env_babbling == 'sagg_riac':
+            self.goal_generator = SAGG_RIAC(mins, maxs)
         elif env_babbling == 'gmm':
             self.goal_generator = InterestGMM(mins, maxs)
         else:
@@ -180,7 +183,7 @@ class EnvParamsSelector(object):
     def record_train_episode(self, reward, ep_len):
         self.env_train_rewards.append(reward)
         self.env_train_len.append(ep_len)
-        if (self.env_babbling == 'sagg_iac') or (self.env_babbling == 'gmm'):
+        if (self.env_babbling == 'sagg_iac') or (self.env_babbling == 'gmm') or (self.env_babbling == 'sagg_riac'):
             reward = np.interp(reward, (-150, 350), (0, 1))
             self.env_train_norm_rewards.append(reward)
         self.goal_generator.update(self.get_env_params_vec(self.env_params_train),
@@ -205,7 +208,7 @@ class EnvParamsSelector(object):
 
     def set_env_params(self, env, kwargs):
         params = self.goal_generator.sample_goal(kwargs)
-        if (self.env_babbling == 'sagg_iac') or (self.env_babbling == 'gmm'):
+        if (self.env_babbling == 'sagg_iac') or (self.env_babbling == 'gmm') or (self.env_babbling == 'sagg_riac'):
             algo_params = copy.copy(params)
             params = {'tunnel_height':None, 'stump_height':None, 'stump_width':None, 'obstacle_spacing':None}
             if (kwargs['stump_height'] is not None) and (kwargs['tunnel_height'] is not None):
