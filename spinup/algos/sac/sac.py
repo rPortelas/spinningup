@@ -415,14 +415,8 @@ if __name__ == '__main__':
     env_f = lambda : gym.make(args.env)
     env_init = {}
     if args.env == "flowers-Walker-continuous-v0":
-        if args.leg_size == "short":
-            env_init = {"LEGW":8,"LEGH":17}
-        elif args.leg_size == "long":
-            env_init = {"LEGW": 8, "LEGH": 51}
-        elif args.leg_size == "default":
-            pass
-        else:
-            raise NotImplementedError
+        env_init['leg_size'] = args.leg_size
+
     sac(env_f, actor_critic=core.mlp_actor_critic,
         ac_kwargs=ac_kwargs,
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,

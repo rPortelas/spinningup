@@ -181,7 +181,7 @@ class EnvParamsSelector(object):
         self.env_train_rewards.append(reward)
         self.env_train_len.append(ep_len)
         if (self.env_babbling == 'sagg_iac') or (self.env_babbling == 'gmm'):
-            reward = np.interp(reward, (-200, 300), (0, 1))
+            reward = np.interp(reward, (-150, 350), (0, 1))
             self.env_train_norm_rewards.append(reward)
         self.goal_generator.update(self.get_env_params_vec(self.env_params_train),
                                    reward, self.env_train_rewards)
