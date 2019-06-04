@@ -148,6 +148,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 
     if len(env_init.items()) > 0:
         env.env.my_init(env_init)
+        test_env.env.my_init(env_init)
 
 
     if env_babbling is not "none": env_params.set_env_params(env,env_kwargs)
