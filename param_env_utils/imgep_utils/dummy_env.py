@@ -350,7 +350,7 @@ def load_stats(id="test",fnum=0):
     try:
         scores, times, names, nb_episodes = pickle.load(open("dummy_env_save_{}.pkl".format(id), "rb"))
     except FileNotFoundError:
-        print('no data for {}'.format(id))
+        print('no data for dummy_env_save_{}.pkl'.format(id))
         return 0
     names = [n[5:] for n in names]  # remove "test_" from names
     plt.figure(fnum)
@@ -360,7 +360,6 @@ def load_stats(id="test",fnum=0):
     for i, algo_scores in enumerate(scores):
         if names[i] == "baranes_gmm":
             names[i] = "covar_gmm"
-        print(names[i])
         ys = algo_scores
         median = np.median(np.array(ys), axis=0)
         # print(median)
@@ -376,8 +375,7 @@ def load_stats(id="test",fnum=0):
 
         ax.set_title(id, fontsize=22)
 
-        print("Algo:{} \n"
-              "times -> mu:{},sig{}".format(i, np.mean(times[i]), np.std(times[i])))
+        print("{}: Algo:{} times -> mu:{},sig{}".format(id, names[i], np.mean(times[i]), np.std(times[i])))
     plt.savefig(id+'.png')
 
 
@@ -414,15 +412,16 @@ if __name__=="__main__":
     #             {"id":"5d5rd4cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_rand_dims":5, "nb_cells":4}]
     exp_args = [{"id": "2d5cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 5},
                 {"id":"2d10cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "nb_cells":10},
-                {"id": "2d20cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 20},
-                {"id": "2d50cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 50},
-                {"id": "2d100cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 100},
-                {"id": "2d5rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 5},
-                {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10},
-                {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20},
-                {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50},
-                {"id": "2d100rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 100}]
-    #exp_args = [{"id":"3d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3}]
+                {"id": "2d20cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 20},
+                {"id": "2d50cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 50},
+                {"id": "2d100cells", "nb_episodes": nb_eps*10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 100}]
+                # {"id": "2d5rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 5},
+                # {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10},
+                # {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20},
+                # {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50},
+                # {"id": "2d100rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 100}]
+    # exp_args = [{"id":"3d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3},
+    #             {"id": "4d5cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 4,"nb_cells": 5}]
     if len(sys.argv) != 2:
         print('launching all experiences')
         exp_nbs = np.arange(0,len(exp_args))
@@ -444,5 +443,5 @@ if __name__=="__main__":
     #     all_ids.append(exp["id"])
     #     load_stats(all_ids[-1], fnum=i)
     # plt.show()
-
+    #
     #
