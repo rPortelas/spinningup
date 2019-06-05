@@ -189,9 +189,10 @@ class SAGG_RIAC():
             self.cps_gs.append(n.data.cps_gs)
 
         # bk-keeping
-        self.all_boxes.append(copy.copy(self.regions_bounds))
-        self.all_interests.append(copy.copy(self.interest))
-        self.split_iterations.append(self.update_nb)
+        if new_split:
+            self.all_boxes.append(copy.copy(self.regions_bounds))
+            self.all_interests.append(copy.copy(self.interest))
+            self.split_iterations.append(self.update_nb)
         assert len(self.interest) == len(self.regions_bounds)
 
         return new_split, None
