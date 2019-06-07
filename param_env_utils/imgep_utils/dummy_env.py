@@ -332,7 +332,7 @@ def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=(test_sagg_i
         for j in range(len(algo_fs)):
             env = NDummyEnv(ndims=ndims, nb_rand_dims=nb_rand_dims, noise=noise, nb_cells=nb_cells)
             start = time.time()
-            algo_results[j].append(algo_fs[j](env, nb_episodes, ndims=ndims+nb_rand_dims, gif=False, verbose=True))
+            algo_results[j].append(algo_fs[j](env, nb_episodes, ndims=ndims+nb_rand_dims, gif=False, verbose=False))
             end = time.time()
             algo_times[j].append(round(end-start))
 
