@@ -52,7 +52,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=100000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-3, alpha=0.005, batch_size=100, start_steps=10000,
         max_ep_len=2000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict(), env_init=dict(),
-        norm_obs=False, env_name='unknown', nb_test_episodes=15, train_freq=1):
+        norm_obs=False, env_name='unknown', nb_test_episodes=50, train_freq=1):
     """
 
     Args:
@@ -142,7 +142,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     np.random.seed(seed)
 
     # Parameterized env init
-    env_params = EnvParamsSelector(env_babbling, nb_test_episodes, env_kwargs)
+    env_params = EnvParamsSelector(env_babbling, nb_test_episodes, env_kwargs, seed=seed)
 
     env, test_env = env_fn(), env_fn()
 
@@ -366,12 +366,12 @@ if __name__ == '__main__':
     parser.add_argument('--l', type=int, default=1)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--exp_name', type=str, default='sac')
     parser.add_argument('--gpu_id', type=int, default=-1)
     parser.add_argument('--ent_coef', type=float, default=0.005)
     parser.add_argument('--max_ep_len', type=int, default=2000)
-    parser.add_argument('--steps_per_ep', type=int, default=100000)
+    parser.add_argument('--steps_per_ep', type=int, default=200000)
     parser.add_argument('--buf_size', type=int, default=1000000)
     # Parameterized bipedal walker related arguments
     parser.add_argument('--env_babbling', type=str, default="none")
@@ -386,7 +386,7 @@ if __name__ == '__main__':
     parser.add_argument('--step_nb', type=float, default=None)
     parser.add_argument('--norm_obs', type=int, default=False)
     parser.add_argument('--env_param_input', type=int, default=False)
-    parser.add_argument('--nb_test_episodes', type=int, default=15)
+    parser.add_argument('--nb_test_episodes', type=int, default=50)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--train_freq', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=100)

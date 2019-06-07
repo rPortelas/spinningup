@@ -1,9 +1,11 @@
 import numpy as np
 import pickle
+import os
 import copy
 from param_env_utils.active_goal_sampling import SAGG_IAC
 from param_env_utils.imgep_utils.sagg_riac import SAGG_RIAC
 from param_env_utils.imgep_utils.gmm import InterestGMM
+from param_env_utils.test_utils import get_test_set_name
 
 
 def get_sorted2d_params(v_min, v_max, eps=1e-3):
@@ -86,8 +88,8 @@ class BaselineGoalGenerator(object):
                         print('mut tunnel: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_tunnel_height,
                                                                            self.max_tunnel_height))
                     if self.train_env_kwargs['obstacle_spacing'] is not None:
-                        self.min_ob_spacing -= self.mutation * 3
-                        self.max_ob_spacing -= self.mutation * 3
+                        self.min_ob_spacing -= self.mutation * 2
+                        self.max_ob_spacing -= self.mutation * 2
                         print('mut ob_spacing: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_ob_spacing,
                                                                            self.max_ob_spacing))
 
@@ -95,7 +97,7 @@ class BaselineGoalGenerator(object):
         return dump_dict
 
 class EnvParamsSelector(object):
-    def __init__(self, env_babbling, nb_test_episodes, train_env_kwargs):
+    def __init__(self, env_babbling, nb_test_episodes, train_env_kwargs, seed=None):
         self.env_babbling = env_babbling
         self.nb_test_episodes = nb_test_episodes
         self.test_ep_counter = 0
@@ -141,14 +143,20 @@ class EnvParamsSelector(object):
         if env_babbling == 'oracle' or env_babbling == 'random':
             self.goal_generator = BaselineGoalGenerator(env_babbling, self.train_env_kwargs)
         elif env_babbling == 'sagg_iac':
-            self.goal_generator = SAGG_IAC(mins, maxs)
+            self.goal_generator = SAGG_IAC(mins, maxs, seed=seed)
         elif env_babbling == 'sagg_riac':
-            self.goal_generator = SAGG_RIAC(mins, maxs)
+            self.goal_generator = SAGG_RIAC(mins, maxs, seed=seed)
         elif env_babbling == 'gmm':
-            self.goal_generator = InterestGMM(mins, maxs)
+            self.goal_generator = InterestGMM(mins, maxs, seed=seed)
         else:
             print('Unknown env babbling')
             raise NotImplementedError
+
+        self.test_mode = "fixed_set" #"levels"
+        if self.test_mode == "fixed_set":
+            name = get_test_set_name(self.train_env_kwargs)
+            self.test_env_list = pickle.load( open("param_env_utils/test_sets/"+name+".pkl", "rb" ) )
+            print('fixed set of {} goals loaded'.format(len(self.test_env_list)))
 
 
 
@@ -247,11 +255,27 @@ class EnvParamsSelector(object):
         random_tunnel_h = None
         random_stump_w = None
         random_ob_spacing = None
-        test_mode = "levels"
-        if test_mode == "random":
+        if self.test_mode == "random":
             if kwargs['stump_height'] is not None:
                 random_stump_h = get_mu_sigma(kwargs['stump_height'][0], kwargs['stump_height'][1])
-        elif test_mode == "levels":
+        elif self.test_mode == "fixed_set":
+            env_args = self.test_env_list[self.test_ep_counter-1]
+            if kwargs['stump_height'] is not None:
+                random_stump_h = [env_args['stump_height'], 0.1]
+            if kwargs['stump_width'] is not None:
+                random_stump_w = [env_args['stump_width'], 0.1]
+            if kwargs['tunnel_height'] is not None:
+                random_tunnel_h = [env_args['tunnel_height'], 0.1]
+            if kwargs['obstacle_spacing'] is not None:
+                random_ob_spacing = env_args['obstacle_spacing']
+
+
+
+
+
+
+
+        elif self.test_mode == "levels":
             nb_levels = 3
             step = self.nb_test_episodes // nb_levels
             step_levels = np.arange(step, self.nb_test_episodes + step, step)
@@ -260,7 +284,6 @@ class EnvParamsSelector(object):
                 if self.test_ep_counter <= step_levels[i]:
                     current_level = i
                     break
-
             # if (kwargs['stump_height'] is not None) and (kwargs['tunnel_height'] is not None):
             #     pass
             if kwargs['stump_height'] is not None:

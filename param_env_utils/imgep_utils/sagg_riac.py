@@ -29,7 +29,7 @@ class Region(object):
 
 # Implementation of SAGG-RIAC
 class SAGG_RIAC():
-    def __init__(self, min, max, temperature=20):  # example --> min: [-1,-1] max: [1,1]
+    def __init__(self, min, max, seed=None):  # example --> min: [-1,-1] max: [1,1]
 
         assert len(min) == len(max)
         self.maxlen = 200
@@ -44,7 +44,6 @@ class SAGG_RIAC():
                                                         cps_gs=[deque(maxlen=self.maxlen + 1), deque(maxlen=self.maxlen + 1)],
                                                         bounds=self.regions_bounds[-1], interest=self.interest[-1]))
         self.nb_dims = len(min)
-        self.temperature = temperature
         self.nb_split_attempts = 50
         self.max_difference = 0.2
         self.init_size = max - min
@@ -57,6 +56,10 @@ class SAGG_RIAC():
         self.all_interests = []
         self.update_nb = 0
         self.split_iterations = []
+
+        if seed is None:
+            seed = np.random.randint(42,424242)
+        np.random.seed(seed)
 
     def compute_interest(self, sub_region):
         if len(sub_region[0]) > self.minlen:  # TRICK NB 4

@@ -39,6 +39,7 @@ class InterestGMM():
         self.seed = seed
         if not seed:
             self.seed = np.random.randint(42,424242)
+        np.random.seed(self.seed)
         self.mins = mins
         self.maxs = maxs
         self.random_goal_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
