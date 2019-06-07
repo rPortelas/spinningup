@@ -78,9 +78,9 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
                                 step_number=kwargs['step_number'])
 
     env_kwargs = {'roughness':None,
-                  'stump_height':[1.0, 1.5],#stump_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
+                  'stump_height':[3.0, 3.0],#stump_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
                   'tunnel_height':None,
-                  'obstacle_spacing':2.5,
+                  'obstacle_spacing':5,
                   'gap_width':None,
                   'step_height':None,
                   'step_number':None}
@@ -95,7 +95,7 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
     img = env.render(mode='rgb_array')
     o = norm(o) if norm_obs else o
     obss = [o]
-    skip = 2
+    skip = 1
     cpt = 0
 
     while n < num_episodes:
@@ -127,13 +127,13 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
             #print("MAX:{}".format(np.max(obss, axis=0)))
             #print("MIN:{}".format(np.min(obss,axis=0)))
 
-
+    #
     # logger.log_tabular('EpRet', with_min_and_max=True)
     # logger.log_tabular('EpLen', average_only=True)
     # logger.dump_tabular()
     # print(len(images))
     # print(np.array(images[0]).shape)
-    # imageio.mimsave('graphics/saggcontez.gif', [np.array(img)[200:315,:-320,:] for i, img in enumerate(images)], fps=29)
+    # imageio.mimsave('graphics/sagglongbest.gif', [np.array(img)[200:315,:-320,:] for i, img in enumerate(images)], fps=29)
 
 
 if __name__ == '__main__':
@@ -141,12 +141,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('fpath', type=str)
     parser.add_argument('--len', '-l', type=int, default=0)
-    parser.add_argument('--episodes', '-n', type=int, default=10)
+    parser.add_argument('--episodes', '-n', type=int, default=5)
     parser.add_argument('--norender', '-nr', action='store_true')
     parser.add_argument('--itr', '-i', type=int, default=-1)
     parser.add_argument('--deterministic', '-d', action='store_true')
+    parser.add_argument('--leg_size', default='none')
     args = parser.parse_args()
     env, get_action = load_policy(args.fpath, 
                                   args.itr if args.itr >=0 else 'last',
                                   args.deterministic)
+
+    env.env.my_init({'leg_size':args.leg_size})
     run_policy(env, get_action, args.len, args.episodes, not(args.norender))
