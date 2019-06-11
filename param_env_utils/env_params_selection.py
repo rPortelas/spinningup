@@ -227,7 +227,7 @@ class EnvParamsSelector(object):
         params = self.goal_generator.sample_goal(kwargs)
         if (self.env_babbling == 'sagg_iac') or (self.env_babbling == 'gmm') or (self.env_babbling == 'sagg_riac'):
             algo_params = copy.copy(params)
-            params = {'tunnel_height':None, 'stump_height':None, 'stump_width':None, 'obstacle_spacing':None}
+            params = {'tunnel_height':None, 'stump_height':None, 'stump_width':None, 'stump_rot':None, 'obstacle_spacing':None}
             if (kwargs['stump_height'] is not None) and (kwargs['tunnel_height'] is not None):
                 params['stump_height'] = [algo_params[0], 0.3]
                 params['tunnel_height'] = [algo_params[1], 0.3]
