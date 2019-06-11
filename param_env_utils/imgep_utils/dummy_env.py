@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import time
 from param_env_utils.active_goal_sampling import SAGG_IAC
 from param_env_utils.imgep_utils.sagg_riac import SAGG_RIAC
-from param_env_utils.imgep_utils.sagg_briac import SAGG_BRIAC
+#from param_env_utils.imgep_utils.sagg_briac import SAGG_BRIAC
 from param_env_utils.imgep_utils.gmm import InterestGMM
 from param_env_utils.imgep_utils.baranes_gmm import BaranesGMM
 from param_env_utils.imgep_utils.cma_es import InterestCMAES
