@@ -424,7 +424,8 @@ if __name__=="__main__":
                 {"id": "5d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 5},
                 {"id": "6d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 6},
                 {"id": "7d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 7},
-                {"id": "8d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 8}]
+                {"id": "8d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 8},
+                {"id": "2d100cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 100}]
     # exp_args = [{"id":"3dhj", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3},
     #              {"id": "4d5cellshj", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 4,"nb_cells": 5}]
     if len(sys.argv) != 2:
@@ -438,8 +439,9 @@ if __name__=="__main__":
         print("launching expe" + sys.argv[1] + " : " + exp_args[exp_nbs[0]]["id"])
 
 
-    for i in exp_nbs:
-         run_stats(**exp_args[i])
+    # for i in exp_nbs:
+    #      run_stats(**exp_args[i])
+    #
 
 
     # #Display all stats
