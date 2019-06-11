@@ -132,7 +132,7 @@ def test_sagg_iac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=
 
 def test_sagg_riac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
     goal_generator = SAGG_RIAC(np.array([0.0]*ndims),
-                                    np.array([1.0]*ndims), temperature=20)
+                                    np.array([1.0]*ndims))
     all_boxes = []
     iterations = []
     interests = []
