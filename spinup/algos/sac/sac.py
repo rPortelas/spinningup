@@ -378,6 +378,7 @@ if __name__ == '__main__':
     #parser.add_argument('--max_stump_h', type=float, default=None)
     parser.add_argument('--max_stump_h', type=float, default=None)
     parser.add_argument('--max_stump_w', type=float, default=None)
+    parser.add_argument('--max_stump_r', type=float, default=None)
     parser.add_argument('--max_tunnel_h', type=float, default=None)
     parser.add_argument('--roughness', type=float, default=None)
     parser.add_argument('--max_obstacle_spacing', type=float, default=None)
@@ -407,6 +408,7 @@ if __name__ == '__main__':
     env_kwargs = {'roughness':args.roughness,
                   'stump_height': None if args.max_stump_h is None else [0, args.max_stump_h],
                   'stump_width': None if args.max_stump_w is None else [0, args.max_stump_w],
+                  'stump_rot': None if args.max_stump_r is None else [0, args.max_stump_r],
                   'tunnel_height': None if args.max_tunnel_h is None else [0, args.max_tunnel_h],
                   'obstacle_spacing': None if args.max_obstacle_spacing is None else [0, args.max_obstacle_spacing],
                   'gap_width':args.max_gap_w,
