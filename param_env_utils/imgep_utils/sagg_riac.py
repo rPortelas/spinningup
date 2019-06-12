@@ -54,7 +54,7 @@ class SAGG_RIAC():
         self.sampled_goals = []
         self.all_boxes = []
         self.all_interests = []
-        self.update_nb = 0
+        self.update_nb = -1
         self.split_iterations = []
 
         if seed is None:
@@ -158,6 +158,7 @@ class SAGG_RIAC():
 
 
     def update(self, goal, continuous_competence, all_raw_rewards):
+        self.update_nb += 1
         # add new (goal, competence) to regions nodes
         self.nodes_to_split = []
         self.nodes_to_recompute = []
@@ -172,7 +173,6 @@ class SAGG_RIAC():
         if need_split:
             new_split = self.split(self.nodes_to_split[0])
             if new_split:
-                self.update_nb += 1
                 #print(self.update_nb)
                 # update list of regions_bounds
                 self.regions_bounds = [n.data.bounds for n in self.tree.all_nodes()]
