@@ -393,7 +393,7 @@ if __name__=="__main__":
     # #
 
     nb_eps = 100000
-    nb_seeds = 5
+    nb_seeds = 30
     algos = (test_sagg_riac, test_baranes_gmm, test_interest_gmm, test_random)
     # exp_args = [{"id":"2d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
     #             {"id":"2dnoise01", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "noise":0.1},
@@ -419,12 +419,13 @@ if __name__=="__main__":
     #             {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20},
     #             {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50},
     #             {"id": "2d100rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 100}]
-    exp_args = [{"id": "3d4cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 3},
+    exp_args = [{"id":"2d10cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
+                {"id": "3d4cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 3},
                 {"id": "4d4cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 4},
                 {"id": "5d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 5},
-                {"id": "6d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 6},
-                {"id": "7d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 7},
-                {"id": "8d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 8},
+                {"id": "6d4cells", "nb_episodes": nb_eps*10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 6},
+                {"id": "7d4cells", "nb_episodes": nb_eps*10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 7},
+                #{"id": "8d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 8},
                 {"id": "2d100cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 100}]
     # exp_args = [{"id":"3dhj", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3},
     #              {"id": "4d5cellshj", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 4,"nb_cells": 5}]
@@ -439,16 +440,15 @@ if __name__=="__main__":
         print("launching expe" + sys.argv[1] + " : " + exp_args[exp_nbs[0]]["id"])
 
 
-    # for i in exp_nbs:
-    #      run_stats(**exp_args[i])
+    for i in exp_nbs:
+         run_stats(**exp_args[i])
+
     #
-
-
     # #Display all stats
     # all_ids = []
     # for i,exp in enumerate(exp_args):
     #     all_ids.append(exp["id"])
     #     load_stats(all_ids[-1], fnum=i)
     # plt.show()
-    #
-    #
+
+
