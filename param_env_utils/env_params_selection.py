@@ -279,7 +279,7 @@ class EnvParamsSelector(object):
             if kwargs['stump_width'] is not None:
                 random_stump_w = [env_args['stump_width'], 0.1]
             if kwargs['stump_rot'] is not None:
-                random_stump_w = [env_args['stump_rot'], 0.1]
+                random_stump_r = [env_args['stump_rot'], 0.1]
             if kwargs['tunnel_height'] is not None:
                 random_tunnel_h = [env_args['tunnel_height'], 0.1]
             if kwargs['obstacle_spacing'] is not None:
