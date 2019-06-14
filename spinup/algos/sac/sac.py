@@ -392,6 +392,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_freq', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--leg_size', type=str, default="default")
+    parser.add_argument('--poly_shape', '-poly', action='store_true')
 
     args = parser.parse_args()
 
@@ -411,6 +412,7 @@ if __name__ == '__main__':
                   'stump_rot': None if args.max_stump_r is None else [0, args.max_stump_r],
                   'tunnel_height': None if args.max_tunnel_h is None else [0, args.max_tunnel_h],
                   'obstacle_spacing': None if args.max_obstacle_spacing is None else [0, args.max_obstacle_spacing],
+                  'poly_shape': None if args.poly_shape is None else [0,6.0],
                   'gap_width':args.max_gap_w,
                   'step_height':args.step_h,
                   'step_number':args.step_nb,
