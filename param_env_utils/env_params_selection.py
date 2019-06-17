@@ -35,7 +35,6 @@ class BaselineGoalGenerator(object):
             self.max_ob_spacing = 6
 
             self.mutation = 0.1
-            self.oracle_std = 0.3
 
             self.mutation_rate = 50 #mutate each 50 episodes
             self.mutation_thr = 230 #reward threshold
@@ -59,10 +58,10 @@ class BaselineGoalGenerator(object):
             if kwargs['obstacle_spacing'] is not None:
                 random_ob_spacing = get_mu_sigma(kwargs['obstacle_spacing'][0], kwargs['obstacle_spacing'][1])[0]
             if kwargs['poly_shape'] is not None:
-                random_poly_shape = np.random.uniform(kwargs['poly_shape'][0], kwargs['poly_shape'][1],10).tolist()
+                random_poly_shape = np.random.uniform(kwargs['poly_shape'][0], kwargs['poly_shape'][1],12).tolist()
         elif self.env_babbling == "oracle":
             if kwargs['stump_height'] is not None:
-                random_stump_h = [np.random.uniform(self.min_stump_height, self.max_stump_height), self.oracle_std]
+                random_stump_h = [np.random.uniform(self.min_stump_height, self.max_stump_height), 0.1]
             # if kwargs['tunnel_height'] is not None:
             #     random_tunnel_h = get_mu_sigma(self.min_tunnel_height, self.max_tunnel_height)
             #     random_tunnel_h[1] = self.oracle_std
@@ -85,18 +84,13 @@ class BaselineGoalGenerator(object):
                 mean_ret = np.mean(env_train_rewards[-50:])
                 if mean_ret > self.mutation_thr:
                     if self.train_env_kwargs['stump_height'] is not None:
-                        self.min_stump_height += self.mutation
-                        self.max_stump_height += self.mutation
+                        self.min_stump_height = min(self.min_stump_height + self.mutation, self.train_env_kwargs['stump_height'][0] - 0.5)
+                        self.max_stump_height = min(self.max_stump_height + self.mutation, self.train_env_kwargs['stump_height'][0])
                         print('mut stump: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_stump_height,
                                                                           self.max_stump_height))
-                    if self.train_env_kwargs['tunnel_height'] is not None:
-                        self.min_tunnel_height -= self.mutation/2
-                        self.max_tunnel_height -= self.mutation/2
-                        print('mut tunnel: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_tunnel_height,
-                                                                           self.max_tunnel_height))
                     if self.train_env_kwargs['obstacle_spacing'] is not None:
-                        self.min_ob_spacing -= self.mutation * 2
-                        self.max_ob_spacing -= self.mutation * 2
+                        self.min_ob_spacing = max(0, self.min_ob_spacing - (self.mutation * 2))
+                        self.max_ob_spacing = max(1, self.max_ob_spacing - (self.mutation * 2))
                         print('mut ob_spacing: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_ob_spacing,
                                                                            self.max_ob_spacing))
 
@@ -147,8 +141,8 @@ class EnvParamsSelector(object):
             mins = np.array([self.min_tunnel_height] * 2)
             maxs = np.array([self.max_tunnel_height] * 2)
         elif train_env_kwargs['poly_shape'] is not None:
-            mins = np.array([train_env_kwargs['poly_shape'][0]] * 10)
-            maxs = np.array([train_env_kwargs['poly_shape'][1]] * 10)
+            mins = np.array([train_env_kwargs['poly_shape'][0]] * 12)
+            maxs = np.array([train_env_kwargs['poly_shape'][1]] * 12)
         else:
             print('Unknown parameters')
             raise NotImplementedError
@@ -298,7 +292,7 @@ class EnvParamsSelector(object):
                 random_tunnel_h = [env_args['tunnel_height'], 0.1]
             if kwargs['obstacle_spacing'] is not None:
                 random_ob_spacing = env_args['obstacle_spacing']
-            if kwargs['poly_shape'] is not None:
+            if 'poly_shape' in kwargs and kwargs['poly_shape'] is not None:
                 random_poly_shape = env_args['poly_shape']
 
         # elif self.test_mode == "levels":
