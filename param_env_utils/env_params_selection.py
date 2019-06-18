@@ -84,8 +84,8 @@ class BaselineGoalGenerator(object):
                 mean_ret = np.mean(env_train_rewards[-50:])
                 if mean_ret > self.mutation_thr:
                     if self.train_env_kwargs['stump_height'] is not None:
-                        self.min_stump_height = min(self.min_stump_height + self.mutation, self.train_env_kwargs['stump_height'][0] - 0.5)
-                        self.max_stump_height = min(self.max_stump_height + self.mutation, self.train_env_kwargs['stump_height'][0])
+                        self.min_stump_height = min(self.min_stump_height + self.mutation, self.train_env_kwargs['stump_height'][1] - 0.5)
+                        self.max_stump_height = min(self.max_stump_height + self.mutation, self.train_env_kwargs['stump_height'][1])
                         print('mut stump: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_stump_height,
                                                                           self.max_stump_height))
                     if self.train_env_kwargs['obstacle_spacing'] is not None:
