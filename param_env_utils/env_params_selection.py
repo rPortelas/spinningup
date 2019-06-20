@@ -150,8 +150,8 @@ class EnvParamsSelector(object):
         # setup goals generator
         if env_babbling == 'oracle' or env_babbling == 'random':
             self.goal_generator = BaselineGoalGenerator(env_babbling, self.train_env_kwargs)
-        elif env_babbling == 'sagg_iac':
-            self.goal_generator = SAGG_IAC(mins, maxs, seed=seed)
+        # elif env_babbling == 'sagg_iac':
+        #     self.goal_generator = SAGG_IAC(mins, maxs, seed=seed)
         elif env_babbling == 'sagg_riac':
             self.goal_generator = SAGG_RIAC(mins, maxs, seed=seed)
         elif env_babbling == 'gmm':

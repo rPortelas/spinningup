@@ -412,7 +412,7 @@ if __name__ == '__main__':
                   'stump_rot': None if args.max_stump_r is None else [0, args.max_stump_r],
                   'tunnel_height': None if args.max_tunnel_h is None else [0, args.max_tunnel_h],
                   'obstacle_spacing': None if args.max_obstacle_spacing is None else [0, args.max_obstacle_spacing],
-                  'poly_shape': None if not args.poly_shape else [0,10.0],
+                  'poly_shape': None if not args.poly_shape else [0,4.0],
                   'gap_width':args.max_gap_w,
                   'step_height':args.step_h,
                   'step_number':args.step_nb,
