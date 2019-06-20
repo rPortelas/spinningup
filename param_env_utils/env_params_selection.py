@@ -164,7 +164,7 @@ class EnvParamsSelector(object):
         if self.test_mode == "fixed_set":
             name = get_test_set_name(self.train_env_kwargs)
             self.test_env_list = pickle.load( open("param_env_utils/test_sets/"+name+".pkl", "rb" ) )
-            print('fixed set of {} goals loaded'.format(len(self.test_env_list)))
+            print('fixed set of {} goals loaded: {}'.format(len(self.test_env_list),name))
 
 
 
