@@ -59,7 +59,8 @@ class BaselineGoalGenerator(object):
             if kwargs['obstacle_spacing'] is not None:
                 random_ob_spacing = get_mu_sigma(kwargs['obstacle_spacing'][0], kwargs['obstacle_spacing'][1])[0]
             if kwargs['poly_shape'] is not None:
-                random_poly_shape = np.random.uniform(kwargs['poly_shape'][0], kwargs['poly_shape'][1],12).tolist()
+                random_poly_shape = np.random.uniform(kwargs['poly_shape'][0],
+                                                      kwargs['poly_shape'][1], 12+kwargs['nb_rand_dim']).tolist()
         elif self.env_babbling == "oracle":
             if kwargs['stump_height'] is not None:
                 random_stump_h = [np.random.uniform(self.min_stump_height, self.max_stump_height), 0.1]
@@ -142,8 +143,8 @@ class EnvParamsSelector(object):
             mins = np.array([self.min_tunnel_height] * 2)
             maxs = np.array([self.max_tunnel_height] * 2)
         elif train_env_kwargs['poly_shape'] is not None:
-            mins = np.array([train_env_kwargs['poly_shape'][0]] * 12)
-            maxs = np.array([train_env_kwargs['poly_shape'][1]] * 12)
+            mins = np.array([train_env_kwargs['poly_shape'][0]] * (12 + train_env_kwargs['nb_rand_dim']))
+            maxs = np.array([train_env_kwargs['poly_shape'][1]] * (12 + train_env_kwargs['nb_rand_dim']))
         else:
             print('Unknown parameters')
             raise NotImplementedError

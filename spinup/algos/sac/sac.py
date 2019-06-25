@@ -393,6 +393,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--leg_size', type=str, default="default")
     parser.add_argument('--poly_shape', '-poly', action='store_true')
+    parser.add_argument('--nb_rand_dim', type=int, default=0)
 
     args = parser.parse_args()
 
@@ -416,7 +417,8 @@ if __name__ == '__main__':
                   'gap_width':args.max_gap_w,
                   'step_height':args.step_h,
                   'step_number':args.step_nb,
-                  'env_param_input':args.env_param_input}
+                  'env_param_input':args.env_param_input,
+                  'nb_rand_dim':args.nb_rand_dim}
     env_f = lambda : gym.make(args.env)
     env_init = {}
     if args.env == "flowers-Walker-continuous-v0":
