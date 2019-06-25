@@ -35,13 +35,18 @@ class EmpiricalLearningProgress():
         return interest
 
 class InterestGMM():
-    def __init__(self, mins, maxs, n_components=None, seed=None):
+    def __init__(self, mins, maxs, n_components=None, seed=None, normalize_reward=False, random_goal_ratio=0.2):
         self.seed = seed
         if not seed:
             self.seed = np.random.randint(42,424242)
         np.random.seed(self.seed)
         self.mins = mins
         self.maxs = maxs
+        self.normalize_reward = normalize_reward
+        if self.normalize_reward:
+            self.max_reward = np.max(np.array(maxs) - np.array(mins)) # reward is scaled according to largest goal space
+
+
         self.random_goal_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
         self.lp_computer = EmpiricalLearningProgress(len(mins))
         self.goals = []
@@ -49,7 +54,7 @@ class InterestGMM():
         self.goals_lps = []
         self.fit_rate = 250
         self.nb_random = 250
-        self.random_goal_ratio = 0.2
+        self.random_goal_ratio = random_goal_ratio
         self.window = 250
         self.potential_ks = np.arange(1,11,1)
 
@@ -64,6 +69,8 @@ class InterestGMM():
             goals = [goals]
         for g, c in zip(goals, competences):
             self.goals.append(g)
+            if self.normalize_reward:
+                c = np.interp(c,[0,1],[0,self.max_reward])
             self.lps.append(self.lp_computer.get_lp(g, c))
             self.goals_lps.append(np.array(g.tolist()+[self.lps[-1]]))
 

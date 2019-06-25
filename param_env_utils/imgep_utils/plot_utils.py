@@ -36,6 +36,7 @@ def plot_regions(boxes, interests, ax=None, xlabel='min stump height', ylabel='m
     if ax == None:
         f, ax = plt.subplots(1, 1, figsize=(8, 7))
     # Add the patch to the Axes
+    print(boxes)
     for b, ints in zip(boxes, interests):
         # print(b)
         lx, ly = b.low
@@ -79,12 +80,13 @@ def region_plot_gif(all_boxes, interests, iterations, goals,
             scatter_plot(goals[0:i], ax=ax[0], emph_data=goals[i - plot_step:i], xlim=xlim, ylim=ylim)
             idx = 0
             cur_idx = 0
+            print(i)
             for j in range(len(all_boxes)):
                 if iterations[j] > i:
                     break
                 else:
                     cur_idx = j
-
+            print(j)
             # ADD TRAINING CURVE
             ax[2].set_ylabel('Train return', fontsize=18)
             steps.append(sum(ep_len[0:i]))
@@ -117,7 +119,7 @@ def draw_ellipse(position, covariance, ax=None, **kwargs):
         width, height = 2 * np.sqrt(covariance)
 
     # Draw the Ellipse
-    for nsig in range(1, 4):
+    for nsig in range(1, 3):
         ax.add_patch(Ellipse(position, nsig * width, nsig * height,
                              angle, **kwargs))
 
@@ -132,22 +134,29 @@ def draw_competence_grid(ax, comp_grid, x_bnds, y_bnds):
 
 def plot_gmm(weights, means, covariances, X, ax=None, xlim=[0,1], ylim=[0,1], xlabel='jkl', ylabel='jhgj'):
     ax = ax or plt.gca()
+    #colors = [plt.cm.jet(i) for i in X[:, -1]]
     colors = [plt.cm.jet(i) for i in X[:, -1]]
-    ax.scatter(X[:, 0], X[:, 1],c=colors, s=3, zorder=2)
+    sizes = [3+np.interp(i,[0,1],[0,10]) for i in X[:, -1]]
+    ax.scatter(X[:, 0], X[:, 1], c=colors, s=sizes, zorder=2)
     #ax.axis('equal')
     w_factor = 0.6 / weights.max()
     for pos, covar, w in zip(means, covariances, weights):
-        draw_ellipse(pos, covar, alpha=w * w_factor)
+        draw_ellipse(pos, covar, alpha=0.6)
 
     cax, _ = cbar.make_axes(ax)
     cb = cbar.ColorbarBase(cax, cmap=plt.cm.jet)
-    cb.set_label('Interest')
+    cb.set_label('Interest', fontsize=25)
+    cax.tick_params(labelsize=20)
 
     ax.axis('equal')
     ax.set_xlim(left=xlim[0], right=xlim[1])
     ax.set_ylim(bottom=ylim[0], top=ylim[1])
+    ax.set_xlabel('stump height', fontsize=25)
+    ax.set_ylabel('spacing', fontsize=25)
+    ax.tick_params(axis='both', which='major', labelsize=20)
 
-def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None, xlim=[0,1], ylim=[0,1], fig_size=(10,6)):
+def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None,
+                 xlim=[0,1], ylim=[0,1], fig_size=(10,6), save_imgs=False):
     plt.ioff()
     # Create target Directory if don't exist
     tmpdir = 'tmp/'
@@ -160,16 +169,18 @@ def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None, xlim=[0,1], yl
     print("Making " + tmppath + gifname + ".gif")
     images = []
     old_ep = 0
+    gen_size = int(len(bk['goals_lps']) / len(bk['episodes']))
     gs_lps = bk['goals_lps']
     for i,(ws, covs, means, ep) in enumerate(zip(bk['weights'], bk['covariances'], bk['means'], bk['episodes'])):
             plt.figure(figsize=fig_size)
             ax = plt.gca()
-            plot_gmm(ws, means, covs, np.array(gs_lps[old_ep:ep]), ax=ax, xlim=xlim, ylim=ylim)
+            plot_gmm(ws, means, covs, np.array(gs_lps[old_ep+gen_size:ep+gen_size]), ax=ax, xlim=xlim, ylim=ylim)  #add gen_size to have gmm + the points that they generated, not they fitted
             if 'comp_grid' in bk:  # add competence grid info
                 draw_competence_grid(ax,bk['comp_grids'][i], bk['comp_xs'][i], bk['comp_ys'][i])
-            f_name = gifdir+tmpdir+"scatter_{}.png".format(ep)
+            f_name = gifdir+tmpdir+gifname+"_{}.png".format(ep)
             plt.suptitle('Episode {} | nb gaussians:{}'.format(ep,len(means)), fontsize=20)
             old_ep = ep
+            if save_imgs: plt.savefig(f_name, bbox_inches='tight')
             images.append(plt_2_rgb(ax))
             plt.close()
 

@@ -14,7 +14,7 @@ from param_env_utils.imgep_utils.gep_utils import proportional_choice
 
 
 class BaranesGMM():
-    def __init__(self, mins, maxs, n_components=None, seed=None):
+    def __init__(self, mins, maxs, n_components=None, seed=None, random_goal_ratio=0.2):
         self.seed = seed
         if not seed:
             self.seed = np.random.randint(np.random.randint(42,424242))
@@ -26,7 +26,7 @@ class BaranesGMM():
         self.fit_rate = 250
         self.nb_random = 250
         #self.window = 250
-        self.random_goal_ratio = 0.1
+        self.random_goal_ratio = random_goal_ratio
         self.potential_ks = np.arange(1,11,1)
         self.all_times = np.arange(0, 1, 1/self.fit_rate)
 
