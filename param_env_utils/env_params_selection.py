@@ -29,8 +29,8 @@ class BaselineGoalGenerator(object):
             self.min_stump_height = 0.0
             self.max_stump_height = 0.5
 
-            self.min_tunnel_height = 1.5
-            self.max_tunnel_height = 2.0
+            self.min_poly_offset = 0.0
+            self.max_poly_offset = 0.66
 
             self.min_ob_spacing = 5
             self.max_ob_spacing = 6
@@ -69,6 +69,8 @@ class BaselineGoalGenerator(object):
             #     random_tunnel_h[1] = self.oracle_std
             if kwargs['obstacle_spacing'] is not None:
                 random_ob_spacing = np.random.uniform(self.min_ob_spacing, self.max_ob_spacing)
+            if kwargs['poly_shape'] is not None:
+                random_poly_shape = np.random.uniform(self.min_poly_offset, self.max_poly_offset, 12).tolist()
         # if (kwargs['stump_height'] is not None) and (kwargs['tunnel_height'] is not None): #if multi dim, fix std
         #     random_stump_h = [random_stump_h[0], 0.3]
         #     random_tunnel_h = [random_tunnel_h[0], 0.3]
@@ -95,6 +97,9 @@ class BaselineGoalGenerator(object):
                         self.max_ob_spacing = max(1, self.max_ob_spacing - (self.mutation * 2))
                         print('mut ob_spacing: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_ob_spacing,
                                                                            self.max_ob_spacing))
+                    if self.train_env_kwargs['poly_shape'] is not None:
+                        self.min_poly_offset = min(self.min_poly_offset + self.mutation, self.train_env_kwargs['poly_shape'][1] - 0.66)
+                        self.max_poly_offset = min(self.max_poly_offset + self.mutation, self.train_env_kwargs['poly_shape'][1])
 
     def dump(self, dump_dict):
         return dump_dict
