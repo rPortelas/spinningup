@@ -14,6 +14,7 @@ from param_env_utils.imgep_utils.plot_utils import cmaes_plot_gif,region_plot_gi
 import pickle
 import copy
 import sys
+from collections import OrderedDict
 import cProfile
 
 class NDummyEnv(object):  # n-dimensional grid
@@ -355,6 +356,14 @@ def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=(test_sagg_i
     pickle.dump(data, open("dummy_env_save_{}.pkl".format(id), "wb"))
 
 def load_stats(id="test",fnum=0):
+    per_model_colors = OrderedDict({'Random': "grey",
+                        'RIAC': u'#ff7f0e',
+                        'ALP-GMM': u'#1f77b4',
+                        'Covar_GMM': "green"})
+    model_medians = OrderedDict({'ALP-GMM': None,
+                                 'RIAC': None,
+                                 'Covar_GMM': None,
+                                 'Random': None})
     try:
         scores, times, names, nb_episodes = pickle.load(open("dummy_env_save_{}.pkl".format(id), "rb"))
     except FileNotFoundError:
@@ -365,25 +374,42 @@ def load_stats(id="test",fnum=0):
     ax = plt.gca()
     colors = ['red','blue','green','orange','purple']
     legend = True
+    max_y = 0
     for i, algo_scores in enumerate(scores):
         if names[i] == "baranes_gmm":
-            names[i] = "covar_gmm"
+            names[i] = "Covar_GMM"
+        if 'riac' in names[i]:
+            names[i] = "RIAC"
+        if 'interest_gmm' in names[i]:
+            names[i] = "ALP-GMM"
+        if names[i] == 'random':
+            names[i] = 'Random'
         ys = algo_scores
-        median = np.median(np.array(ys), axis=0)
+        model_medians[names[i]] = np.median(np.array(ys), axis=0)
         # print(median)
+        episodes = np.arange(0,nb_episodes+1000,1000) / 1000
+        #print(episodes)
         for k, y in enumerate(ys):
+            if max(y) > max_y:
+                max_y = max(y)
             # print("max:{} last:{}".format(max(y), y[-1]))
-            ax.plot(np.arange(0,nb_episodes+1000,1000), y, color=colors[i], linewidth=0.9, alpha=0.2)
-        ax.plot(np.arange(0,nb_episodes+1000,1000), median, color=colors[i], linewidth=5, label=names[i])
-        ax.set_xlabel('episodes', fontsize=18)
-        ax.set_ylabel('% mastered cells', fontsize=18)
-        ax.set_xlim(xmin=0, xmax=nb_episodes)
-        if legend:
-            leg = ax.legend(loc='bottom right', fontsize=14)
+            ax.plot(episodes, y, color=per_model_colors[names[i]], linewidth=0.9, alpha=0.2)
+    for algo_name, med in model_medians.items():
+        ax.plot(episodes, med, color=per_model_colors[algo_name], linewidth=5, label=algo_name)
+    ax.set_xlabel('Episodes (x1000)', fontsize=20)
+    ax.set_ylabel('% Mastered cells', fontsize=20)
+    ax.set_xlim(xmin=0, xmax=nb_episodes/1000)
+    ax.set_ylim(ymin=0, ymax=max_y)
+    ax.locator_params(axis='x', nbins=5)
+    ax.locator_params(axis='y', nbins=5)
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    if legend:
+        leg = ax.legend(loc='bottom right', fontsize=14)
 
-        ax.set_title(id, fontsize=22)
+    ax.set_title(id, fontsize=28)
 
-        print("{}: Algo:{} times -> mu:{},sig{}".format(id, names[i], np.mean(times[i]), np.std(times[i])))
+    print("{}: Algo:{} times -> mu:{},sig{}".format(id, names[i], np.mean(times[i]), np.std(times[i])))
+    plt.tight_layout()
     plt.savefig(id+'.png')
 
 
@@ -403,7 +429,7 @@ if __name__=="__main__":
 
     nb_eps = 100000
     nb_seeds = 30
-    algos = (test_sagg_riac, test_baranes_gmm, test_interest_gmm, test_random)
+    algos = (test_sagg_riac, test_interest_gmm, test_baranes_gmm, test_random)
     # exp_args = [{"id":"2d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
     #             {"id":"2dnoise01", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "noise":0.1},
     #             {"id": "2dnoise005", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "noise": 0.05},
@@ -428,19 +454,19 @@ if __name__=="__main__":
     #             {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20},
     #             {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50},
     #             {"id": "2d100rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 100}]
-    exp_args = [{"id":"2d10cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
-                {"id": "4d4cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 4},
+    exp_args = [#{"id":"2d10cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
+                #{"id": "4d4cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 4},
                 {"id": "5d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 5},
                 {"id": "6d4cells", "nb_episodes": nb_eps*10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 6},
-                {"id": "2d20cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 20},
+               # {"id": "2d20cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 20},
                 {"id": "2d50cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 50},
                 {"id": "2d100cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 100},
-                {"id": "2d20cellslong", "nb_episodes": nb_eps * 2, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 20},
+                #{"id": "2d20cellslong", "nb_episodes": nb_eps * 2, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 20},
                 {"id": "2d50cellslong", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 50},
-                {"id": "2d100cellslong", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 100},
-                {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10},
-                {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20},
-                {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50}]
+                {"id": "2d100cellslong", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 100}]
+               # {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10},
+               # {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20},
+               # {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50}]
     #exp_args = [{"id":"reward3d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3}]
     #              {"id": "4d5cellshj", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 4,"nb_cells": 5}]
     if len(sys.argv) != 2:

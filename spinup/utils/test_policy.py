@@ -29,7 +29,14 @@ def params_2_env_list(param_list,key):
     env_list = []
     for p in param_list:
         env_arg = copy.copy(empty_arg_ranges)
-        env_arg[key] = p
+        if len(key) == 1:
+            env_arg[key] = p
+        else:
+            for i, k in enumerate(key):
+                # print(i)
+                # print(p)
+                # print(env_arg)
+                env_arg[k] = p[i]
         env_list.append(env_arg)
     return env_list
 
@@ -135,8 +142,8 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
                   'step_number':None}
 
     #test_env_list = pickle.load(open("/home/remy/projects/spinningup/param_env_utils/test_sets/poly_shape0_6.0.pkl", "rb"))
-    test_env_list = pickle.load(open("/home/remy/projects/spinningup/param_env_utils/test_sets/stump_height0_3.0obstacle_spacing0_6.0.pkl", "rb"))
-
+    #test_env_list = pickle.load(open("/home/remy/projects/spinningup/param_env_utils/test_sets/stump_height0_3.0obstacle_spacing0_6.0.pkl", "rb"))
+    test_env_list = params_2_env_list([[0.41,3.28],[1.02,0.81],[1.22,4.44]],['stump_height','obstacle_spacing'])
     # final_list = []
     # for i in [19]:
     #     final_list.append(test_env_list[i])
@@ -153,9 +160,9 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
         norm = MaxMinFilter(env_params_dict=env_kwargs)
 
     images = []
-    increments = np.array([-0.4, 0, -0.4, 0.2, -0.2, 0.4, 0.2, 0.4, 0.4, 0.2, 0.4, 0.0])
-    init_poly = np.zeros(12)
-    init_poly += 5
+    # increments = np.array([-0.4, 0, -0.4, 0.2, -0.2, 0.4, 0.2, 0.4, 0.4, 0.2, 0.4, 0.0])
+    # init_poly = np.zeros(12)
+    # init_poly += 5
     for i,args in enumerate(test_env_list):
 
         #args = params_2_env_list([init_poly],'poly_shape')[0]
@@ -173,7 +180,7 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
         skip = 100
         cpt = 0
 
-        save_img = False
+        save_img = True
 
         while n < num_episodes:
             if render:
@@ -184,7 +191,7 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
                         images.append(img)
 
                         if save_img:
-                            plt.imsave("graphics/walker_images/quad_walker_gmm{}.png".format(cpt), np.array(img)[150:315,:-320,:])
+                            plt.imsave("graphics/walker_images/default_walker_gmm_{}.png".format(i), np.array(img)[150:315,:-320,:])
                     else:
                         env.render()
                 time.sleep(1e-3)
