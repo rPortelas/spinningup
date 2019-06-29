@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 import time
 from param_env_utils.active_goal_sampling import SAGG_IAC
 from param_env_utils.imgep_utils.sagg_riac import SAGG_RIAC
-#from param_env_utils.imgep_utils.goal_gan import GOAL_GAN
-#from param_env_utils.imgep_utils.sagg_briac import SAGG_BRIAC
 from param_env_utils.imgep_utils.gmm import InterestGMM
 from param_env_utils.imgep_utils.baranes_gmm import BaranesGMM
 from param_env_utils.imgep_utils.cma_es import InterestCMAES
@@ -46,7 +44,7 @@ class NDummyEnv(object):  # n-dimensional grid
         assert(len(point) == self.all_ndims)
         for v in point:
             if (v < 0.0) or (v > 1.0):
-                print("OUT OF BOUNDS")
+                #print("OUT OF BOUNDS")
                 self.points.append(point)
                 return 0.
         pts = point[0:self.ndims]  # discard random dimensions
@@ -93,44 +91,9 @@ class NDummyEnv(object):  # n-dimensional grid
 
 
         normalized_competence = np.interp(self.cell_competence[cell_idx], (0, self.max_per_cell), (0, 1))
-        if self.noise >= 0.0:
-            normalized_competence = np.clip(normalized_competence + np.random.normal(0,self.noise), 0, 1)
+        # if self.noise >= 0.0:
+        #     normalized_competence = np.clip(normalized_competence + np.random.normal(0,self.noise), 0, 1)
         return normalized_competence
-
-def test_sagg_iac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
-    goal_generator = SAGG_IAC(np.array([0.0]*ndims),
-                                    np.array([1.0]*ndims), temperature=20)
-    all_boxes = []
-    iterations = []
-    interests = []
-    rewards = []
-    scores = []
-    for i in range(nb_episodes+1):
-        if (i % score_step) == 0:
-            scores.append(env.get_score())
-            if ndims == 2:
-                if verbose:
-                    print(env.cell_competence)
-            else:
-                if verbose:
-                    print(scores[-1])
-        goal = goal_generator.sample_goal(None)
-        comp = env.episode(goal)
-        split, _ = goal_generator.update(np.array(goal), comp, None)
-
-        # book keeping
-        if split:
-            boxes = goal_generator.region_bounds
-            interest = goal_generator.interest
-            interests.append(copy.copy(interest))
-            iterations.append(i)
-            all_boxes.append(copy.copy(boxes))
-        rewards.append(comp)
-
-    if gif:
-        region_plot_gif(all_boxes, interests, iterations, goal_generator.sampled_goals,
-                        gifname='dummysagg', ep_len=[1]*nb_episodes, rewards=rewards, gifdir='gifs/')
-    return scores
 
 def test_sagg_riac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
     goal_generator = SAGG_RIAC(np.array([0.0]*ndims),
@@ -154,7 +117,7 @@ def test_sagg_riac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose
         split, _ = goal_generator.update(np.array(goal), comp, None)
 
         # book keeping
-        if split:
+        if split and gif:
             boxes = goal_generator.regions_bounds
             interest = goal_generator.interest
             interests.append(copy.copy(interest))
@@ -165,41 +128,6 @@ def test_sagg_riac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose
     if gif:
         region_plot_gif(all_boxes, interests, iterations, goal_generator.sampled_goals,
                         gifname='dummysaggriac', ep_len=[1]*nb_episodes, rewards=rewards, gifdir='gifs/')
-    return scores
-
-def test_sagg_briac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
-    goal_generator = SAGG_BRIAC(np.array([0.0]*ndims),
-                                    np.array([1.0]*ndims), temperature=20)
-    all_boxes = []
-    iterations = []
-    interests = []
-    rewards = []
-    scores = []
-    for i in range(nb_episodes+1):
-        if (i % score_step) == 0:
-            scores.append(env.get_score())
-            if ndims == 2:
-                if verbose:
-                    print(env.cell_competence)
-            else:
-                if verbose:
-                    print(scores[-1])
-        goal = goal_generator.sample_goal(None)
-        comp = env.episode(goal)
-        split, _ = goal_generator.update(np.array(goal), comp, None)
-
-        # book keeping
-        if split:
-            boxes = goal_generator.regions_bounds
-            interest = goal_generator.interest
-            interests.append(copy.copy(interest))
-            iterations.append(i)
-            all_boxes.append(copy.copy(boxes))
-        rewards.append(comp)
-
-    if gif:
-        region_plot_gif(all_boxes, interests, iterations, goal_generator.sampled_goals,
-                        gifname='dummysaggbriac', ep_len=[1]*nb_episodes, rewards=rewards, gifdir='gifs/')
     return scores
 
 def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
@@ -217,7 +145,7 @@ def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verb
             else:
                 if verbose:
                     print(scores[-1])
-        if i>100 and (i % goal_generator.fit_rate) == 0:
+        if i>100 and (i % goal_generator.fit_rate) == 0 and (gif is True):
             bk['weights'].append(goal_generator.gmm.weights_.copy())
             bk['covariances'].append(goal_generator.gmm.covariances_.copy())
             bk['means'].append(goal_generator.gmm.means_.copy())
@@ -229,20 +157,11 @@ def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verb
                 bk['comp_ys'].append(env.bnds[1].copy())
 
         goal = goal_generator.sample_goal()
-        # print("bef")
-        # print(goal)
-        # np.interp(goal,[0,10],[0,1])
-        # print("aff")
-        # print(goal)
         comp = env.episode(goal)
-        # if comp > 0:
-        #     print(comp)
-        #comp = env.episode(goal)
         goal_generator.update([np.array(goal)], [comp])
         rewards.append(comp)
     if gif:
         gmm_plot_gif(bk, gifname='gmm'+str(time.time()), gifdir='gifs/')
-    # final eval
     return scores
 
 def test_baranes_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
@@ -259,8 +178,8 @@ def test_baranes_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbo
                     print(env.cell_competence)
             else:
                 if verbose:
-                    print(scores[-1])
-        if i>100 and (i % goal_generator.fit_rate) == 0:
+                    print("it:{}, score:{}".format(i,scores[-1]))
+        if i>100 and (i % goal_generator.fit_rate) == 0 and (gif is True):
             bk['weights'].append(goal_generator.gmm.weights_.copy())
             bk['covariances'].append(goal_generator.gmm.covariances_.copy())
             bk['means'].append(goal_generator.gmm.means_.copy())
@@ -277,7 +196,6 @@ def test_baranes_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbo
         rewards.append(comp)
     if gif:
         gmm_plot_gif(bk, gifname='baranesgmm'+str(time.time()), gifdir='gifs/')
-    # final eval
     return scores
 
 def test_CMAES(env, nb_episodes, gif=True, score_step=1000):
@@ -333,7 +251,7 @@ def test_random(env, nb_episodes, ndims=2, gif=False, score_step=1000, verbose=T
     return scores
 
 
-def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=(test_sagg_iac, test_interest_gmm),
+def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=None,
               nb_seeds=100, noise=0.0, nb_cells=10, id="test"):
     print("starting stats on {}".format(id))
     algo_results, algo_times = [[] for _ in range(len(algo_fs))], [[] for _ in range(len(algo_fs))]
@@ -430,45 +348,19 @@ if __name__=="__main__":
     nb_eps = 100000
     nb_seeds = 30
     algos = (test_sagg_riac, test_interest_gmm, test_baranes_gmm, test_random)
-    # exp_args = [{"id":"2d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
-    #             {"id":"2dnoise01", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "noise":0.1},
-    #             {"id": "2dnoise005", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "noise": 0.05},
-    #             {"id":"2d2rd", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "nb_rand_dims":2},
-    #             {"id":"2d5rd", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "nb_rand_dims":5},
-    #             {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10},
-    #             {"id":"3d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3},
-    #             {"id":"4d5cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":4, "nb_cells":5},
-    #             {"id":"5d4cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_cells":4},
-    #             {"id": "5d6cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 5,"nb_cells": 6},
-    #             {"id":"5d7cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_cells":7},
-    #             {"id": "10d4cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 10, "nb_cells": 4},
-    #             {"id": "8d4cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 8, "nb_cells": 4},
-    #             {"id":"5d5rd4cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":5, "nb_rand_dims":5, "nb_cells":4}]
-    # exp_args = [{"id": "2d5cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 5},
-    #             {"id":"2d10cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "nb_cells":10},
-    #             {"id": "2d20cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 20},
-    #             {"id": "2d50cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 50},
-    #             {"id": "2d100cells", "nb_episodes": nb_eps*10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 100},
-    #             {"id": "2d5rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 5},
-    #             {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10},
-    #             {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20},
-    #             {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50},
-    #             {"id": "2d100rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 100}]
     exp_args = [#{"id":"2d10cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
                 #{"id": "4d4cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 4},
-                {"id": "5d4cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 5},
-                {"id": "6d4cells", "nb_episodes": nb_eps*10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 6},
+                {"id": "bmm5d4cells", "nb_episodes": nb_eps*5, "algo_fs": [test_baranes_gmm], "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 5},
+                {"id": "bmm6d4cells", "nb_episodes": nb_eps*10, "algo_fs": [test_baranes_gmm], "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 6},
                # {"id": "2d20cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 20},
                 {"id": "2d50cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 50},
-                {"id": "2d100cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 100},
+                {"id": "2d100cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 100}]
                 #{"id": "2d20cellslong", "nb_episodes": nb_eps * 2, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 20},
-                {"id": "2d50cellslong", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 50},
-                {"id": "2d100cellslong", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 100}]
+                #{"id": "2d50cellslong", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 50},
+                #{"id": "2d100cellslong", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 100}]
                # {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10},
                # {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20},
                # {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50}]
-    #exp_args = [{"id":"reward3d", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "ndims":3}]
-    #              {"id": "4d5cellshj", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "ndims": 4,"nb_cells": 5}]
     if len(sys.argv) != 2:
         print('launching all experiences')
         exp_nbs = np.arange(0,len(exp_args))
@@ -483,12 +375,12 @@ if __name__=="__main__":
     for i in exp_nbs:
          run_stats(**exp_args[i])
 
-    #
     # #Display all stats
     # all_ids = []
     # for i,exp in enumerate(exp_args):
     #     all_ids.append(exp["id"])
     #     load_stats(all_ids[-1], fnum=i)
     # plt.show()
+    #
 
 

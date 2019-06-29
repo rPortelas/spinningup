@@ -24,10 +24,6 @@ class Region(object):
         return need_split
 
 
-
-
-
-# Implementation of SAGG-RIAC
 class SAGG_RIAC():
     def __init__(self, min, max, seed=None):  # example --> min: [-1,-1] max: [1,1]
 
@@ -45,7 +41,6 @@ class SAGG_RIAC():
                                                         bounds=self.regions_bounds[-1], interest=self.interest[-1]))
         self.nb_dims = len(min)
         self.nb_split_attempts = 50
-        self.max_difference = 0.2
         self.init_size = max - min
         self.ndims = len(min)
         self.mode_3_noise = 0.1
@@ -79,7 +74,6 @@ class SAGG_RIAC():
         # try nb_split_attempts splits
         reg = self.tree.get_node(nid).data
         best_split_score = 0
-        best_abs_interest_diff = 0
         best_bounds = None
         best_sub_regions = None
         is_split = False
@@ -120,22 +114,18 @@ class SAGG_RIAC():
 
             # compute score
             split_score = len(sub_reg1) * len(sub_reg2) * np.abs(interest[0] - interest[1])
-            if split_score >= best_split_score and valid_bounds: # TRICK NB 3, max diff #and np.abs(interest[0] - interest[1]) >= self.max_difference / 8
+            if split_score >= best_split_score and valid_bounds:
                 is_split = True
-                best_abs_interest_diff = np.abs(interest[0] - interest[1])
                 best_split_score = split_score
                 best_sub_regions = sub_regions
                 best_bounds = bounds
 
         if is_split:
-            if best_abs_interest_diff > self.max_difference:
-                self.max_difference = best_abs_interest_diff
             # add new nodes to tree
             for i, (cps_gs, bounds) in enumerate(zip(best_sub_regions, best_bounds)):
                 self.tree.create_node(identifier=self.tree.size(), parent=nid,
                                       data=Region(self.maxlen, cps_gs=cps_gs, bounds=bounds, interest=interest[i]))
         else:
-            #print("abort mission")
             # TRICK NB 6, remove old stuff if can't find split
             assert len(reg.cps_gs[0]) == (self.maxlen + 1)
             reg.cps_gs[0] = deque(islice(reg.cps_gs[0], int(self.maxlen / 4), self.maxlen + 1))
@@ -223,22 +213,6 @@ class SAGG_RIAC():
         else:  # "mode 1" (70%) -> sampling on regions and then random goal in selected region
             region_id = proportional_choice(self.interest, eps=0.0)
             self.sampled_goals.append(self.regions_bounds[region_id].sample())
-
-
-        # # sample region
-        # if np.random.rand() < 0.2:
-        #     region_id = np.random.choice(range(self.nb_regions))
-        # else:
-        #     region_id = np.random.choice(range(self.nb_regions), p=np.array(self.probas))
-
-        # # sample goal
-        # self.sampled_goals.append(self.regions_bounds[region_id].sample())
-        #
-        # return self.sampled_goals[-1].tolist()
-        # sample region
-        # region_id = proportional_choice(self.interest, eps=0.2)
-        # # sample goal
-        # self.sampled_goals.append(self.regions_bounds[region_id].sample())
 
         return self.sampled_goals[-1]
 
