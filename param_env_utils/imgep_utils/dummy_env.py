@@ -1,13 +1,11 @@
 import numpy as np
 import scipy.stats as sp
-import matplotlib.pyplot as plt
 import time
 from param_env_utils.active_goal_sampling import SAGG_IAC
 from param_env_utils.imgep_utils.sagg_riac import SAGG_RIAC
 from param_env_utils.imgep_utils.gmm import InterestGMM
 from param_env_utils.imgep_utils.baranes_gmm import BaranesGMM
 #from param_env_utils.imgep_utils.cma_es import InterestCMAES
-from param_env_utils.imgep_utils.plot_utils import region_plot_gif, plot_gmm, gmm_plot_gif
 import pickle
 import copy
 import sys
@@ -273,6 +271,8 @@ def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=None,
     pickle.dump(data, open("dummy_env_save_{}.pkl".format(id), "wb"))
 
 def load_stats(id="test",fnum=0):
+    from param_env_utils.imgep_utils.plot_utils import region_plot_gif, plot_gmm, gmm_plot_gif
+    import matplotlib.pyplot as plt
     per_model_colors = OrderedDict({'Random': "grey",
                         'RIAC': u'#ff7f0e',
                         'ALP-GMM': u'#1f77b4',
