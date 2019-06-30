@@ -10,7 +10,7 @@ import pickle
 import copy
 import sys
 from collections import OrderedDict
-import cProfile
+#import cProfile
 
 class NDummyEnv(object):  # n-dimensional grid
     def __init__(self, nb_cells=10, ndims=2, noise=0.0, nb_rand_dims=0, forget=False):
