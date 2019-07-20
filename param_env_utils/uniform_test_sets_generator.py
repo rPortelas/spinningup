@@ -10,10 +10,11 @@ arg_ranges = {'roughness':None,
               'stump_width':None,#[3.0,5.0],
               'tunnel_height':None,
               'obstacle_spacing':None,#[0,6.0],
-              'poly_shape':[0,4.0],#[0,10.0],
+              'poly_shape':None,#[0,4.0],#[0,10.0],
               'gap_width':None,
               'step_height':None,
-              'step_number':None}
+              'step_number':None,
+              'stump_seq':[0,6.0]}
 
 name = get_test_set_name(arg_ranges)
 test_env_list = []
@@ -26,6 +27,8 @@ for i in range(sample_size):
         if v is not None:
             if k == "poly_shape":
                 point.append(np.random.uniform(v[0],v[1],12))
+            elif k == 'stump_seq':
+                point.append(np.random.uniform(v[0], v[1], 10))
             else:
                 point.append(np.random.uniform(v[0], v[1]))
             test_env[k] = point[-1]

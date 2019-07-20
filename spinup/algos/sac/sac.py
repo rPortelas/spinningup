@@ -393,6 +393,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--leg_size', type=str, default="default")
     parser.add_argument('--poly_shape', '-poly', action='store_true')
+    parser.add_argument('--stump_seq', '-seq', action='store_true')
     parser.add_argument('--nb_rand_dim', type=int, default=0)
     # alp-gmm related arguments
     parser.add_argument('--gmm_fitness_fun', '-fit', type=str, default=None)
@@ -412,8 +413,8 @@ if __name__ == '__main__':
     if args.hid != -1:
         ac_kwargs['hidden_sizes'] = [args.hid]*args.l
 
+    params = {}
     if args.env_babbling == 'gmm':
-        params = {}
         if args.gmm_fitness_fun is not None:
             params['gmm_fitness_fun'] = args.gmm_fitness_fun
         if args.min_k is not None and args.max_k is not None:
@@ -429,6 +430,7 @@ if __name__ == '__main__':
                   'tunnel_height': None if args.max_tunnel_h is None else [0, args.max_tunnel_h],
                   'obstacle_spacing': None if args.max_obstacle_spacing is None else [0, args.max_obstacle_spacing],
                   'poly_shape': None if not args.poly_shape else [0,4.0],
+                  'stump_seq': None if not args.stump_seq else [0,6.0],
                   'gap_width':args.max_gap_w,
                   'step_height':args.step_h,
                   'step_number':args.step_nb,
