@@ -105,7 +105,7 @@ class BaselineGoalGenerator(object):
         return dump_dict
 
 class EnvParamsSelector(object):
-    def __init__(self, env_babbling, nb_test_episodes, train_env_kwargs, seed=None):
+    def __init__(self, env_babbling, nb_test_episodes, train_env_kwargs, seed=None, teacher_params={}):
         self.env_babbling = env_babbling
         self.nb_test_episodes = nb_test_episodes
         self.test_ep_counter = 0
@@ -162,7 +162,7 @@ class EnvParamsSelector(object):
         elif env_babbling == 'sagg_riac':
             self.goal_generator = SAGG_RIAC(mins, maxs, seed=seed)
         elif env_babbling == 'gmm':
-            self.goal_generator = InterestGMM(mins, maxs, seed=seed)
+            self.goal_generator = InterestGMM(mins, maxs, seed=seed, params=teacher_params)
         elif env_babbling == 'bmm':
             self.goal_generator = BaranesGMM(mins, maxs, seed=seed)
         else:

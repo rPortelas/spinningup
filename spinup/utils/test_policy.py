@@ -10,7 +10,7 @@ from spinup.utils.normalization_utils import MaxMinFilter
 import gym
 import gym_flowers
 import imageio
-from matplotlib import pyplot as plt
+#from matplotlib import pyplot as plt
 import pickle
 import copy
 
@@ -119,17 +119,30 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
                                 gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
                                 step_number=kwargs['step_number'], poly_shape=kwargs['poly_shape'])
 
+    def poly_2_width_height(params):
+            scaling = 14 / 30.0
+            obstacle_polygon = [(-0.5, 0), (-0.5, 0.25), (-0.25, 0.5), (0.25, 0.5), (0.5, 0.25), (0.5, 0)]
+            paired_params = [[params[i], params[i + 1]] for i in range(0, len(params), 2)]
+            # first recover polygon coordinate
+            poly_coord = []
+            for i, (b, d) in enumerate(zip(obstacle_polygon, paired_params)):
+                # print(paired_params)
+                if i != 0 and i != (len(obstacle_polygon) - 1):
+                    poly_coord.append([(b[0] * scaling) + (d[0] * scaling),
+                                       (b[1] * scaling) + (d[1] * scaling)])
+                else:
+                    poly_coord.append([(b[0] * scaling) + (d[0] * scaling),
+                                       (b[1] * scaling)])
+            # the find maximal width and height
+            poly_coord = np.array(poly_coord)
+            min_x = np.min(poly_coord[:, 0])
+            max_x = np.max(poly_coord[:, 0])
+            min_y = np.min(poly_coord[:, 1])
+            max_y = np.max(poly_coord[:, 1])
+            height_width_params = [(max_x - min_x) / scaling, (max_y - min_y) / scaling]
+            return np.round(height_width_params,2)
+
     # simple exp: random short fails compared to gmm -> [0.84,5.39] run 11
-
-
-
-    # env_kwargs = {'roughness':None,
-    #               'stump_height':[2.90,2.90],#stump_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
-    #               'tunnel_height':None,
-    #               'obstacle_spacing':4,
-    #               'gap_width':None,
-    #               'step_height':None,
-    #               'step_number':None}
 
     env_kwargs = {'roughness':None,
                   'stump_height':[0.50,0.50],#stump_levels = [[0., 0.66], [0.66, 1.33], [1.33, 2.]]
@@ -141,9 +154,12 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
                   'step_height':None,
                   'step_number':None}
 
-    #test_env_list = pickle.load(open("/home/remy/projects/spinningup/param_env_utils/test_sets/poly_shape0_6.0.pkl", "rb"))
-    #test_env_list = pickle.load(open("/home/remy/projects/spinningup/param_env_utils/test_sets/stump_height0_3.0obstacle_spacing0_6.0.pkl", "rb"))
-    test_env_list = params_2_env_list([[0.41,3.28],[1.02,0.81],[1.22,4.44]],['stump_height','obstacle_spacing'])
+    #test_env_list = pickle.load(open("/home/remy/projects/spinningup/param_env_utils/test_sets/poly_shape0_4.0.pkl", "rb"))
+    test_env_list = pickle.load(open("/home/remy/projects/spinningup/param_env_utils/test_sets/stump_height0_3.0obstacle_spacing0_6.0.pkl", "rb"))
+    test_env_list = params_2_env_list([[0.4,0.8]],['stump_height','obstacle_spacing']) #short agent seed 7(or 11)
+    #test_env_list = params_2_env_list([[0,0],[0.7,1.0],[1.6,5.5],[1.9,0.01]],['stump_height', 'obstacle_spacing']) # default agent seed 0
+    #test_env_list = params_2_env_list([[0,0],[3.0,0.0],[3.0,5], [1.5,0.5]],['stump_height', 'obstacle_spacing']) # long agent seed 0
+
     # final_list = []
     # for i in [19]:
     #     final_list.append(test_env_list[i])
@@ -159,12 +175,12 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
     if norm_obs:
         norm = MaxMinFilter(env_params_dict=env_kwargs)
 
-    images = []
     # increments = np.array([-0.4, 0, -0.4, 0.2, -0.2, 0.4, 0.2, 0.4, 0.4, 0.2, 0.4, 0.0])
     # init_poly = np.zeros(12)
     # init_poly += 5
     for i,args in enumerate(test_env_list):
-
+        # if i not in [48,36]:#[3,10, 8, 19, 26]:#,26]:
+        #     continue
         #args = params_2_env_list([init_poly],'poly_shape')[0]
         # if i not in [0,1,3,6,4]:
         #     continue
@@ -174,14 +190,15 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
         set_test_env_params(**args)
         #init_poly += increments
         o, r, d, ep_ret, ep_len, n = env.reset(), 0, False, 0, 0, 0
-        #img = env.render(mode='rgb_array')
+        img = env.render(mode='rgb_array')
         o = norm(o) if norm_obs else o
         obss = [o]
-        skip = 100
+        skip = 2
         cpt = 0
+        #wh = poly_2_width_height(args['poly_shape'])
 
-        save_img = True
-
+        save_img = False
+        images = []
         while n < num_episodes:
             if render:
                 cpt+=1
@@ -191,7 +208,7 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
                         images.append(img)
 
                         if save_img:
-                            plt.imsave("graphics/walker_images/default_walker_gmm_{}.png".format(i), np.array(img)[150:315,:-320,:])
+                            plt.imsave("graphics/walker_images/a_quadru_complex_walker_gmm_{}_{}_{}.png".format(wh, i, cpt), np.array(img)[150:315,:-320,:])
                     else:
                         env.render()
                 time.sleep(1e-3)
@@ -205,7 +222,8 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
 
             if d or (ep_len == max_ep_len):
                 logger.store(EpRet=ep_ret, EpLen=ep_len)
-                print('Episode %d \t EpRet %.3f \t EpLen %d'%(n, ep_ret, ep_len))
+                #print('Episode {}:{} \t EpRet {} \t EpLen {}'.format(i, wh, ep_ret, ep_len))
+                print('Episode {}:{} \t EpRet {} \t EpLen {}'.format(i, args['stump_height'], ep_ret, ep_len))
                 #set_test_env_params(**env_kwargs)
                 o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
                 o = norm(o) if norm_obs else o
@@ -221,7 +239,10 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
         # print(np.array(images[0]).shape)
     #[150:315,:-320,:] for long
     #[200:315,:-320,:] for default
-    #imageio.mimsave('graphics/randdefaultpoly.gif', [np.array(img)[200:315,:-320,:] for i, img in enumerate(images)], fps=29)
+        #imageio.mimsave('graphics/stump_gmm_demo_compact_{}.gif'.format(i), [np.array(img)[150:315,:-320,:] for i, img in enumerate(images)], fps=29)
+        imageio.mimsave('graphics/demo_short_stump_gmm_asquad_{}.gif'.format(i), [np.array(img)[150:315,:-320,:] for i, img in enumerate(images)], fps=29)
+        #imageio.mimsave('graphics/demo_default_stump_gmm_asquad_{}.gif'.format(i), [np.array(img)[150:315,:-320,:] for i, img in enumerate(images)], fps=29)
+        #imageio.mimsave('graphics/demo_quadru_stump_gmm_compact_{}.gif'.format(i), [np.array(img)[150:315,:-320,:] for i, img in enumerate(images)], fps=29)
 
 
 if __name__ == '__main__':

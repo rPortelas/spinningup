@@ -8,6 +8,7 @@ import numpy as np
 import copy
 import os
 from matplotlib.patches import Ellipse
+import matplotlib.colors as colors
 
 def plt_2_rgb(ax):
     ax.figure.canvas.draw()
@@ -15,8 +16,14 @@ def plt_2_rgb(ax):
     data = data.reshape(ax.figure.canvas.get_width_height()[::-1] + (3,))
     return data
 
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
+    new_cmap = colors.LinearSegmentedColormap.from_list(
+        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+        cmap(np.linspace(minval, maxval, n)))
+    return new_cmap
 
-def scatter_plot(data, ax=None, emph_data=None, xlabel='min stump height', ylabel='max stump height', xlim=None, ylim=None):
+
+def scatter_plot(data, ax=None, emph_data=None, xlabel='stump height', ylabel='spacing', xlim=None, ylim=None):
     if ax is None:
         f, ax = plt.subplots(1, 1, figsize=(7, 7))
     Xs, Ys = [d[0] for d in data], [d[1] for d in data]
@@ -31,12 +38,13 @@ def scatter_plot(data, ax=None, emph_data=None, xlabel='min stump height', ylabe
     ax.set_xlabel(xlabel, fontsize=20)
     ax.set_ylabel(ylabel, fontsize=20)
 
-def plot_regions(boxes, interests, ax=None, xlabel='min stump height', ylabel='max stump height', xlim=None, ylim=None):
+def plot_regions(boxes, interests, ax=None, xlabel='stump height', ylabel='spacing', xlim=None, ylim=None, bar=True):
+    ft_off = 15
     # Create figure and axes
     if ax == None:
         f, ax = plt.subplots(1, 1, figsize=(8, 7))
     # Add the patch to the Axes
-    print(boxes)
+    #print(boxes)
     for b, ints in zip(boxes, interests):
         # print(b)
         lx, ly = b.low
@@ -46,18 +54,22 @@ def plot_regions(boxes, interests, ax=None, xlabel='min stump height', ylabel='m
         ax.add_patch(rect)
         # plt.Rectangle([lx,ly],(hx - lx), (hy - ly))
 
-    cax, _ = cbar.make_axes(ax)
-    cb = cbar.ColorbarBase(cax, cmap=plt.cm.jet)
-    cb.set_label('Mean Competence Progress')
-    ax.axis('equal')
+    if bar:
+        cax, _ = cbar.make_axes(ax, shrink=0.8)
+        cb = cbar.ColorbarBase(cax, cmap=plt.cm.jet)
+        cb.set_label('Average Learning Progress', fontsize=ft_off + 5)
+        cax.tick_params(labelsize=ft_off + 0)
     ax.set_xlim(left=xlim[0], right=xlim[1])
     ax.set_ylim(bottom=ylim[0], top=ylim[1])
-    ax.set_xlabel(xlabel, fontsize=20)
-    ax.set_ylabel(ylabel, fontsize=20)
+    ax.set_xlabel(xlabel, fontsize=ft_off + 0)
+    ax.set_ylabel(ylabel, fontsize=ft_off + 0)
+    ax.tick_params(axis='both', which='major', labelsize=ft_off + 0)
+    ax.set_aspect('equal', 'box')
 
 
-def region_plot_gif(all_boxes, interests, iterations, goals,
-                    gifname='saggriac', rewards=None, ep_len=None, gifdir='graphics/', xlim=[0,1], ylim=[0,1]):
+def region_plot_gif(all_boxes, interests, iterations, goals, gifname='saggriac', rewards=None, ep_len=None,
+                    gifdir='graphics/', xlim=[0,1], ylim=[0,1], scatter=False, fs=(5,8), plot_step=250):
+    ft_off = 15
     plt.ioff()
     print("Making an exploration GIF: " + gifname)
     # Create target Directory if don't exist
@@ -72,34 +84,32 @@ def region_plot_gif(all_boxes, interests, iterations, goals,
     images = []
     steps = []
     mean_rewards = []
-    plot_step = 250
     for i in range(len(goals)):
         if i > 0 and (i % plot_step == 0):
-            f, (ax0, ax1, ax2) = plt.subplots(1, 3, figsize=(27, 7))
-            ax = [ax0, ax1, ax2]
-            scatter_plot(goals[0:i], ax=ax[0], emph_data=goals[i - plot_step:i], xlim=xlim, ylim=ylim)
+            f, (ax0) = plt.subplots(1, 1, figsize=fs)
+            ax = [ax0]
+            if scatter:
+                scatter_plot(goals[0:i], ax=ax[0], emph_data=goals[i - plot_step:i], xlim=xlim, ylim=ylim)
             idx = 0
             cur_idx = 0
-            print(i)
             for j in range(len(all_boxes)):
                 if iterations[j] > i:
                     break
                 else:
                     cur_idx = j
-            print(j)
-            # ADD TRAINING CURVE
-            ax[2].set_ylabel('Train return', fontsize=18)
-            steps.append(sum(ep_len[0:i]))
-            mean_rewards.append(np.mean(rewards[i - plot_step:i]))
-            ax[2].plot(steps, mean_rewards)
+            # # ADD TRAINING CURVE
+            # ax[2].set_ylabel('Train return', fontsize=18)
+            # steps.append(sum(ep_len[0:i]))
+            # mean_rewards.append(np.mean(rewards[i - plot_step:i]))
+            # ax[2].plot(steps, mean_rewards)
 
-            plot_regions(all_boxes[cur_idx], interests[cur_idx], ax=ax[1], xlim=xlim, ylim=ylim)
+            plot_regions(all_boxes[cur_idx], interests[cur_idx], ax=ax[0], xlim=xlim, ylim=ylim)
 
             f_name = gifdir+tmpdir+"scatter_{}.png".format(i)
-            plt.suptitle('Episode {}'.format(i), fontsize=20)
+            plt.suptitle('Episode {}'.format(i), fontsize=ft_off+0)
             images.append(plt_2_rgb(plt.gca()))
             plt.close(f)
-    imageio.mimsave(gifdir + gifname + '.gif', images, duration=0.3)
+    imageio.mimsave(gifdir + gifname + '.gif', images, duration=0.4)
 
 
 def draw_ellipse(position, covariance, ax=None, **kwargs):
@@ -132,10 +142,14 @@ def draw_competence_grid(ax, comp_grid, x_bnds, y_bnds):
     cax.yaxis.set_ticks_position('left')
     cax.yaxis.set_label_position('left')
 
-def plot_gmm(weights, means, covariances, X, ax=None, xlim=[0,1], ylim=[0,1], xlabel='jkl', ylabel='jhgj', bar=True):
+def plot_gmm(weights, means, covariances, X, ax=None, xlim=[0,1], ylim=[0,1],
+             xlabel='jkl', ylabel='jhgj', bar=True, bar_side='right',no_y=False):
+    ft_off = 15
+
     ax = ax or plt.gca()
+    cmap = truncate_colormap(plt.cm.autumn_r, minval=0.2,maxval=1.0)
     #colors = [plt.cm.jet(i) for i in X[:, -1]]
-    colors = [plt.cm.autumn_r(i) for i in X[:, -1]]
+    colors = [cmap(i) for i in X[:, -1]]
     sizes = [5+np.interp(i,[0,1],[0,10]) for i in X[:, -1]]
     ax.scatter(X[:, 0], X[:, 1], c=colors, s=sizes, zorder=2)
     #ax.axis('equal')
@@ -147,14 +161,21 @@ def plot_gmm(weights, means, covariances, X, ax=None, xlim=[0,1], ylim=[0,1], xl
     ax.set_xlim(left=xlim[0], right=xlim[1])
     ax.set_ylim(bottom=ylim[0], top=ylim[1])
     if bar:
-        cax, _ = cbar.make_axes(ax)
-        cb = cbar.ColorbarBase(cax, cmap=plt.cm.autumn_r)
-        cb.set_label('Learning progress', fontsize=25)
-        cax.tick_params(labelsize=20)
-
-    ax.set_xlabel('stump height', fontsize=25)
-    #ax.set_ylabel('spacing', fontsize=25)
-    ax.tick_params(axis='both', which='major', labelsize=20)
+        cax, _ = cbar.make_axes(ax, location=bar_side, shrink=0.8)
+        cb = cbar.ColorbarBase(cax, cmap=cmap)
+        cb.set_label('Learning progress', fontsize=ft_off + 5)
+        cax.tick_params(labelsize=ft_off + 0)
+        cax.yaxis.set_ticks_position(bar_side)
+        cax.yaxis.set_label_position(bar_side)
+    #ax.yaxis.tick_right()
+    if no_y:
+        ax.set_yticks([])
+    else:
+        ax.set_ylabel('spacing', fontsize=ft_off + 5)
+        #ax.yaxis.set_label_position("right")
+    ax.set_xlabel('stump height', fontsize=ft_off + 5)
+    ax.tick_params(axis='both', which='major', labelsize=ft_off + 0)
+    ax.set_aspect('equal', 'box')
 
 def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None,
                  xlim=[0,1], ylim=[0,1], fig_size=(9,6), save_imgs=False, title=True, bar=True):
@@ -181,13 +202,13 @@ def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None,
                 draw_competence_grid(ax,bk['comp_grids'][i], bk['comp_xs'][i], bk['comp_ys'][i])
             f_name = gifdir+tmpdir+gifname+"_{}.png".format(ep)
             if title:
-                plt.suptitle('Episode {} | nb gaussians:{}'.format(ep,len(means)), fontsize=20)
+                plt.suptitle('Episode {} | nb Gaussians:{}'.format(ep,len(means)), fontsize=20)
             old_ep = ep
             if save_imgs: plt.savefig(f_name, bbox_inches='tight')
             images.append(plt_2_rgb(ax))
             plt.close()
 
-    imageio.mimsave(gifdir + gifname + '.gif', images, duration=0.3)
+    imageio.mimsave(gifdir + gifname + '.gif', images, duration=0.4)
 
 
 def plot_cmaes(mean, covariance, ints, X, sigma, currX=None, currInts=None,

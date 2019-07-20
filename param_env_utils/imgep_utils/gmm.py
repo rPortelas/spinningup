@@ -10,6 +10,7 @@ import copy
 from gym.spaces import Box
 from param_env_utils.imgep_utils.dataset import BufferedDataset
 from param_env_utils.imgep_utils.gep_utils import proportional_choice
+from param_env_utils.imgep_utils.dwgmm import DimensionallyWeightedGMM
 
 class EmpiricalLearningProgress():
     def __init__(self, goal_size):
@@ -35,18 +36,28 @@ class EmpiricalLearningProgress():
         return interest
 
 class InterestGMM():
-    def __init__(self, mins, maxs, n_components=None, seed=None, normalize_reward=False, random_goal_ratio=0.2):
+    def __init__(self, mins, maxs, n_components=None, seed=None, params=dict(), random_goal_ratio=0.2,
+                 gmm_fitness_fun='bic'):
         self.seed = seed
         if not seed:
             self.seed = np.random.randint(42,424242)
         np.random.seed(self.seed)
         self.mins = mins
         self.maxs = maxs
-        self.normalize_reward = normalize_reward
+
+        self.normalize_reward = False if "normalize reward" not in params else params["normalize reward"]
         if self.normalize_reward:
             self.max_reward = np.max(np.array(maxs) - np.array(mins)) # reward is scaled according to largest goal space
 
-
+        self.potential_ks = np.arange(1,11,1) if "potential_ks" not in params else params["potential_ks"]
+        self.warm_start = False if "warm_start" not in params else params["warm_start"]
+        self.gmm_fitness_fun = "bic" if "gmm_fitness_fun" not in params else params["gmm_fitness_fun"]
+        self.use_weighted_gmm = False if "weighted_gmm" not in params else True
+        # print(self.warm_start)
+        # print(self.gmm_fitness_fun)
+        # print(self.potential_ks[0])
+        # print(self.potential_ks[-1])
+        # print(self.use_weighted_gmm)
         self.random_goal_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
         self.lp_computer = EmpiricalLearningProgress(len(mins))
         self.goals = []
@@ -56,11 +67,22 @@ class InterestGMM():
         self.nb_random = 250
         self.random_goal_ratio = random_goal_ratio
         self.window = 250
-        self.potential_ks = np.arange(1,11,1)
+
+        # init GMMs
+        self.potential_gmms = [self.init_gmm(k) for k in self.potential_ks]
 
         # boring book-keeping
         self.bk = {'weights': [], 'covariances': [], 'means': [], 'goals_lps': [], 'episodes': [],
               'comp_grids': [], 'comp_xs': [], 'comp_ys': []}
+
+    def init_gmm(self, nb_gaussians):
+        if self.use_weighted_gmm:
+            return DimensionallyWeightedGMM(n_components=nb_gaussians, covariance_type='full', random_state=self.seed,
+                   warm_start=self.warm_start)
+        else:
+            return GMM(n_components=nb_gaussians, covariance_type='full', random_state=self.seed,
+                                            warm_start=self.warm_start)
+
 
     def update(self, goals, competences,all_rewards=None):
         if not isinstance(competences, list):
@@ -80,13 +102,18 @@ class InterestGMM():
                 #print(np.array(self.goals_lps).shape)
                 #print(np.array(self.goals_lps))
                 cur_goals_lps = np.array(self.goals_lps[-self.window:])
-                potential_gmms = [GMM(n_components=k, covariance_type='full', random_state=self.seed) for k in self.potential_ks]
-                potential_gmms = [g.fit(cur_goals_lps) for g in potential_gmms]#  fit all
+                self.potential_gmms = [g.fit(cur_goals_lps) for g in self.potential_gmms]#  fit all
 
-                bics = [m.bic(cur_goals_lps) for m in potential_gmms]
+                if self.gmm_fitness_fun == 'bic':
+                    fitnesses = [m.bic(cur_goals_lps) for m in self.potential_gmms]
+                elif self.gmm_fitness_fun == 'aic':
+                    fitnesses = [m.aic(cur_goals_lps) for m in self.potential_gmms]
+                else:
+                    raise NotImplementedError
+                    exit(1)
                 #plt.plot(self.potential_ks, bics, label='BIC')
                 #plt.show()
-                self.gmm = potential_gmms[np.argmin(bics)]
+                self.gmm = self.potential_gmms[np.argmin(fitnesses)]
 
                 # book-keeping
                 self.bk['weights'].append(self.gmm.weights_.copy())

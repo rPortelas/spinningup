@@ -52,7 +52,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=100000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-3, alpha=0.005, batch_size=100, start_steps=10000,
         max_ep_len=2000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict(), env_init=dict(),
-        norm_obs=False, env_name='unknown', nb_test_episodes=50, train_freq=1):
+        norm_obs=False, env_name='unknown', nb_test_episodes=50, train_freq=1, teacher_params={}):
     """
 
     Args:
@@ -142,7 +142,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     np.random.seed(seed)
 
     # Parameterized env init
-    env_params = EnvParamsSelector(env_babbling, nb_test_episodes, env_kwargs, seed=seed)
+    env_params = EnvParamsSelector(env_babbling, nb_test_episodes, env_kwargs, seed=seed, teacher_params=teacher_params)
 
     env, test_env = env_fn(), env_fn()
 
@@ -361,7 +361,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='HalfCheetah-v2')
+    parser.add_argument('--env', type=str, default="flowers-Walker-continuous-v0")
     parser.add_argument('--hid', type=int, default=-1)
     parser.add_argument('--l', type=int, default=1)
     parser.add_argument('--gamma', type=float, default=0.99)
@@ -394,6 +394,11 @@ if __name__ == '__main__':
     parser.add_argument('--leg_size', type=str, default="default")
     parser.add_argument('--poly_shape', '-poly', action='store_true')
     parser.add_argument('--nb_rand_dim', type=int, default=0)
+    # alp-gmm related arguments
+    parser.add_argument('--gmm_fitness_fun', '-fit', type=str, default=None)
+    parser.add_argument('--min_k', type=int, default=None)
+    parser.add_argument('--max_k', type=int, default=None)
+    parser.add_argument('--weighted_gmm','-wgmm', action='store_true')
 
     args = parser.parse_args()
 
@@ -406,6 +411,16 @@ if __name__ == '__main__':
     ac_kwargs = dict()
     if args.hid != -1:
         ac_kwargs['hidden_sizes'] = [args.hid]*args.l
+
+    if args.env_babbling == 'gmm':
+        params = {}
+        if args.gmm_fitness_fun is not None:
+            params['gmm_fitness_fun'] = args.gmm_fitness_fun
+        if args.min_k is not None and args.max_k is not None:
+            params['potential_ks'] = np.arange(args.min_k, args.max_k,1)
+        if args.weighted_gmm is True:
+            params['weighted_gmm'] = args.weighted_gmm
+
 
     env_kwargs = {'roughness':args.roughness,
                   'stump_height': None if args.max_stump_h is None else [0, args.max_stump_h],
@@ -431,4 +446,4 @@ if __name__ == '__main__':
         steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size,
         env_babbling=args.env_babbling, env_kwargs=env_kwargs, env_init=env_init, norm_obs=args.norm_obs,
         env_name=args.env, nb_test_episodes=args.nb_test_episodes, lr=args.lr, train_freq=args.train_freq,
-        batch_size=args.batch_size)
+        batch_size=args.batch_size, teacher_params=params)
