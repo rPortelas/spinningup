@@ -9,4 +9,4 @@ args = parser.parse_args()
 
 for script in args.scripts:
     for r in range(args.repeats):
-        os.system("./{} {}".format(script,r))
+        os.system("sbatch {} {}".format(script,r))
