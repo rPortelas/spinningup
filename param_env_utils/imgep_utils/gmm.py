@@ -84,6 +84,15 @@ class InterestGMM():
                                             warm_start=self.warm_start)
 
 
+    def get_nb_gmm_params(self, gmm):
+        # assumes full covariance
+        # see https://stats.stackexchange.com/questions/229293/the-number-of-parameters-in-gaussian-mixture-model
+        nb_gmms = gmm.get_params()['n_components']
+        d = len(self.mins)
+        params_per_gmm = (d*d - d)/2 + 2*d + 1
+        return nb_gmms * params_per_gmm - 1
+
+
     def update(self, goals, competences,all_rewards=None):
         if not isinstance(competences, list):
             competences = [competences]
@@ -108,6 +117,13 @@ class InterestGMM():
                     fitnesses = [m.bic(cur_goals_lps) for m in self.potential_gmms]
                 elif self.gmm_fitness_fun == 'aic':
                     fitnesses = [m.aic(cur_goals_lps) for m in self.potential_gmms]
+                elif self.gmm_fitness_fun == 'aicc':
+                    n = self.fit_rate
+                    fitnesses = []
+                    for l, m in enumerate(self.potential_gmms):
+                        k = self.get_nb_gmm_params(m)
+                        penalty = (2*k*(k+1)) / (n-k-1)
+                        fitnesses.append(m.aic(cur_goals_lps) + penalty)
                 else:
                     raise NotImplementedError
                     exit(1)
