@@ -2,7 +2,8 @@ import numpy as np
 import scipy.stats as sp
 import time
 from param_env_utils.active_goal_sampling import SAGG_IAC
-from param_env_utils.imgep_utils.sagg_riac import SAGG_RIAC
+from param_env_utils.imgep_utils.riac import RIAC
+from param_env_utils.imgep_utils.florensa_riac import Florensa_RIAC
 from param_env_utils.imgep_utils.gmm import InterestGMM
 from param_env_utils.imgep_utils.baranes_gmm import BaranesGMM
 #from param_env_utils.imgep_utils.cma_es import InterestCMAES
@@ -92,9 +93,14 @@ class NDummyEnv(object):  # n-dimensional grid
         #     normalized_competence = np.clip(normalized_competence + np.random.normal(0,self.noise), 0, 1)
         return normalized_competence
 
-def test_sagg_riac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
-    goal_generator = SAGG_RIAC(np.array([0.0]*ndims),
-                                    np.array([1.0]*ndims))
+def test_riac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True, params={}):
+    if 'use_florensa' in params:
+        print('florensuse')
+        goal_generator = Florensa_RIAC(np.array([0.0] * ndims),
+                              np.array([1.0] * ndims), params=params)
+    else:
+        goal_generator = RIAC(np.array([0.0] * ndims),
+                              np.array([1.0]*ndims), params=params)
     all_boxes = []
     iterations = []
     interests = []
@@ -127,8 +133,42 @@ def test_sagg_riac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose
                         gifname='dummysaggriac', ep_len=[1]*nb_episodes, rewards=rewards, gifdir='gifs/')
     return scores
 
-def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
-    goal_generator = InterestGMM([0]*ndims, [1]*ndims)
+def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True, params={}):
+    goal_generator = InterestGMM([0]*ndims, [1]*ndims, params=params)
+    rewards = []
+    scores = []
+    bk = {'weights':[], 'covariances':[], 'means':[], 'goals_lps':[], 'episodes':[],
+          'comp_grids':[], 'comp_xs':[], 'comp_ys':[]}
+    for i in range(nb_episodes+1):
+        if (i % score_step) == 0:
+            scores.append(env.get_score())
+            if ndims == 2:
+                if verbose:
+                    print(env.cell_competence)
+            else:
+                if verbose:
+                    print(scores[-1])
+        if i>100 and (i % goal_generator.fit_rate) == 0 and (gif is True):
+            bk['weights'].append(goal_generator.gmm.weights_.copy())
+            bk['covariances'].append(goal_generator.gmm.covariances_.copy())
+            bk['means'].append(goal_generator.gmm.means_.copy())
+            bk['goals_lps'] = goal_generator.goals_lps
+            bk['episodes'].append(i)
+            if ndims == 2:
+                bk['comp_grids'].append(env.cell_competence.copy())
+                bk['comp_xs'].append(env.bnds[0].copy())
+                bk['comp_ys'].append(env.bnds[1].copy())
+
+        goal = goal_generator.sample_goal()
+        comp = env.episode(goal)
+        goal_generator.update([np.array(goal)], [comp])
+        rewards.append(comp)
+    if gif:
+        gmm_plot_gif(bk, gifname='gmm'+str(time.time()), gifdir='gifs/')
+    return scores
+
+def test_interest_gmm_aic(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
+    goal_generator = InterestGMM([0]*ndims, [1]*ndims, gmm_fitness_fun='aic')
     rewards = []
     scores = []
     bk = {'weights':[], 'covariances':[], 'means':[], 'goals_lps':[], 'episodes':[],
@@ -249,15 +289,17 @@ def test_random(env, nb_episodes, ndims=2, gif=False, score_step=1000, verbose=T
 
 
 def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=None,
-              nb_seeds=100, noise=0.0, nb_cells=10, id="test"):
+              nb_seeds=100, noise=0.0, nb_cells=10, id="test", params={}, names=[]):
     print("starting stats on {}".format(id))
     algo_results, algo_times = [[] for _ in range(len(algo_fs))], [[] for _ in range(len(algo_fs))]
-    names = [str(f).split(" ")[1] for f in algo_fs]
+    if len(names) == 0:
+        names = [str(f).split(" ")[1] for f in algo_fs]
     for i in range(nb_seeds):
+        print(i)
         for j in range(len(algo_fs)):
             env = NDummyEnv(ndims=ndims, nb_rand_dims=nb_rand_dims, noise=noise, nb_cells=nb_cells)
             start = time.time()
-            algo_results[j].append(algo_fs[j](env, nb_episodes, ndims=ndims+nb_rand_dims, gif=False, verbose=False))
+            algo_results[j].append(algo_fs[j](env, nb_episodes, ndims=ndims+nb_rand_dims, gif=False, verbose=False, params=params[j]))
             end = time.time()
             algo_times[j].append(round(end-start))
 
@@ -272,7 +314,65 @@ def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=None,
 
 def load_stats(id="test",fnum=0):
     from param_env_utils.imgep_utils.plot_utils import region_plot_gif, plot_gmm, gmm_plot_gif
-    import matplotlib.pyplot as plt
+    per_model_colors = OrderedDict({})
+    model_medians = OrderedDict({})
+    try:
+        scores, times, names, nb_episodes = pickle.load(open("dummy_env_save_{}.pkl".format(id), "rb"))
+        if id == "6d4cells" or id == "5d4cells":
+            scores2, times2, names2, nb_episodes2 = pickle.load(open("dummy_env_save_{}.pkl".format("bmm"+id), "rb"))
+    except FileNotFoundError:
+        print('no data for dummy_env_save_{}.pkl'.format(id))
+        return 0
+    if 'test_' in names[0]:
+        names = [n[5:] for n in names]  # remove "test_" from names
+    plt.figure(fnum)
+    ax = plt.gca()
+    colors = ['red','blue','green','orange','purple']
+    legend = True
+    max_y = 0
+    for k in range(len(names)):
+        if names[k] == 'our_iac':
+            names[k] = "our_riac_leaves_only"
+    for i, algo_scores in enumerate(scores):
+        if names[i] not in model_medians:
+            model_medians[names[i]] = None
+        ys = algo_scores
+        model_medians[names[i]] = np.median(np.array(ys), axis=0)
+        # print(median)
+        episodes = np.arange(0,nb_episodes+1000,1000) / 1000
+        #print(episodes)
+        #print(model_medians)
+        for k, y in enumerate(ys):
+            if max(y) > max_y:
+                max_y = max(y)
+            # print("max:{} last:{}".format(max(y), y[-1]))
+            if names[i] in per_model_colors:
+                model_color = per_model_colors[names[i]]
+            else:
+                model_color = None
+            ax.plot(episodes, y, color=model_color, linewidth=0.9, alpha=0.2)
+    for algo_name, med in model_medians.items():
+        ax.plot(episodes, med, color=model_color, linewidth=5, label=algo_name)
+    ax.set_xlabel('Episodes (x1000)', fontsize=20)
+    ax.set_ylabel('% Mastered cells', fontsize=20)
+    ax.set_xlim(xmin=0, xmax=nb_episodes/1000)
+    ax.set_ylim(ymin=0, ymax=max_y)
+    ax.locator_params(axis='x', nbins=5)
+    ax.locator_params(axis='y', nbins=5)
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    if legend:
+        leg = ax.legend(loc='bottom right', fontsize=14)
+
+    if "long" in id:
+        id = id[:-4]
+    ax.set_title(id, fontsize=28)
+
+    print("{}: Algo:{} times -> mu:{},sig{}".format(id, names[i], np.mean(times[i]), np.std(times[i])))
+    plt.tight_layout()
+    plt.savefig(id+'.png')
+
+def load_stats_camera_ready(id="test",fnum=0):
+    from param_env_utils.imgep_utils.plot_utils import region_plot_gif, plot_gmm, gmm_plot_gif
     per_model_colors = OrderedDict({'Random': "grey",
                         'RIAC': u'#ff7f0e',
                         'ALP-GMM': u'#1f77b4',
@@ -283,6 +383,8 @@ def load_stats(id="test",fnum=0):
                                  'Random': None})
     try:
         scores, times, names, nb_episodes = pickle.load(open("dummy_env_save_{}.pkl".format(id), "rb"))
+        if id == "6d4cells" or id == "5d4cells":
+            scores2, times2, names2, nb_episodes2 = pickle.load(open("dummy_env_save_{}.pkl".format("bmm"+id), "rb"))
     except FileNotFoundError:
         print('no data for dummy_env_save_{}.pkl'.format(id))
         return 0
@@ -295,6 +397,8 @@ def load_stats(id="test",fnum=0):
     for i, algo_scores in enumerate(scores):
         if names[i] == "baranes_gmm":
             names[i] = "Covar_GMM"
+            if id == "6d4cells" or id == "5d4cells":
+                algo_scores = scores2[0]
         if 'riac' in names[i]:
             names[i] = "RIAC"
         if 'interest_gmm' in names[i]:
@@ -323,6 +427,8 @@ def load_stats(id="test",fnum=0):
     if legend:
         leg = ax.legend(loc='bottom right', fontsize=14)
 
+    if "long" in id:
+        id = id[:-4]
     ax.set_title(id, fontsize=28)
 
     print("{}: Algo:{} times -> mu:{},sig{}".format(id, names[i], np.mean(times[i]), np.std(times[i])))
@@ -346,20 +452,47 @@ if __name__=="__main__":
 
     nb_eps = 100000
     nb_seeds = 30
-    algos = (test_sagg_riac, test_interest_gmm, test_baranes_gmm, test_random)
-    exp_args = [#{"id":"2d10cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
-                #{"id": "4d4cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 4},
-                {"id": "bmm5d4cells", "nb_episodes": nb_eps*5, "algo_fs": [test_baranes_gmm], "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 5},
-                {"id": "bmm6d4cells", "nb_episodes": nb_eps*10, "algo_fs": [test_baranes_gmm], "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 6},
-               # {"id": "2d20cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 20},
-                {"id": "2d50cells", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 50},
-                {"id": "2d100cells", "nb_episodes": nb_eps*5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 100},
-                #{"id": "2d20cellslong", "nb_episodes": nb_eps * 2, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 20},
-                {"id": "2d50cellslong", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 50},
-                {"id": "2d100cellslong", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 100}]
-               # {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10},
-               # {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20},
-               # {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50}]
+    #algos = (test_interest_gmm, test_interest_gmm, test_interest_gmm, test_interest_gmm, test_interest_gmm, test_interest_gmm)
+    #names = ["gmm_aic"        , "gmm"            , "gmm_ws"         , "gmm3"            , "gmm6", "gmm9"]
+    #params = [{"gmm_fitness_fun":"aic"}, {}      , {"warm_start":True}, {"potential_ks":np.arange(3,11,1)}, {"potential_ks":np.arange(6,11,1)}, {"potential_ks":np.arange(9,11,1)}]
+    algos = (test_riac, test_riac, test_riac, test_riac, test_riac, test_riac)
+    names = ["our_iac",
+             "vanilla_riac",
+             "florensa_riac",
+             "florensa_riac_our_params",
+             "our_riac",
+             "our_riac_their_params"]
+    params = [{"sampling_in_leaves_only":True},
+              {"min_reg_size":1, "min_dims_range_ratio":1/np.inf},
+              {"use_florensa":True},
+              {"use_florensa":True, "max_region_size":200, "lp_window_size":200},
+              {},
+              {"max_region_size":500, "lp_window_size":100}]
+    #algos = (test_sagg_riac, test_interest_gmm, test_baranes_gmm, test_random)
+    # exp_args = [{"id":"2d10cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
+    #             {"id": "4d4cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 4},
+    #              {"id": "5d4cells", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "ndims": 5},
+    #             {"id": "6d4cells", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "ndims": 6},
+    #             {"id": "2d20cellslong", "nb_episodes": nb_eps * 2, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 20},
+    #             {"id": "2d50cellslong", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 50},
+    #             {"id": "2d100cellslong", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 100},
+    #             {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10},
+    #             {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20},
+    #             {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50}]
+
+    exp_args = [{"id":"2d10cells_us_vs_Florensa", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names},
+                {"id": "4d4cells_us_vs_Florensa", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 4, "params": params, "names":names},
+                {"id": "5d4cells_us_vs_Florensa", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "ndims": 5, "params": params, "names":names},
+                {"id": "6d4cells_us_vs_Florensa", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "ndims": 6, "params": params, "names":names},
+                {"id": "2d20cellslong_us_vs_Florensa", "nb_episodes": nb_eps * 2, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 20, "params": params, "names":names},
+                {"id": "2d50cellslong_us_vs_Florensa", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 50, "params": params, "names":names},
+                {"id": "2d100cellslong_us_vs_Florensa", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 100, "params": params, "names":names},
+                {"id": "2d10rd_us_vs_Florensa", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10, "params": params, "names":names},
+                {"id": "2d20rd_us_vs_Florensa", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20, "params": params, "names":names},
+                {"id": "2d50rd_us_vs_Florensa", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50, "params": params, "names":names}]
+    # exp_args = [{"id": "2d50rd", "nb_episodes": nb_eps * 2, "algo_fs": [test_interest_gmm], "nb_seeds": nb_seeds, "nb_cells": 4,
+    #              "ndims": 2, "nb_rand_dims":50, "params":[{}]}]
+
     if len(sys.argv) != 2:
         print('launching all experiences')
         exp_nbs = np.arange(0,len(exp_args))
@@ -375,6 +508,7 @@ if __name__=="__main__":
          run_stats(**exp_args[i])
 
     # #Display all stats
+    # import matplotlib.pyplot as plt
     # all_ids = []
     # for i,exp in enumerate(exp_args):
     #     all_ids.append(exp["id"])

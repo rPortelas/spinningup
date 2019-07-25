@@ -49,7 +49,7 @@ class LearningModule(object):
         if self.goal_sampling != 'active':
             goal = np.random.random(self.o_size) * 2 - 1
             self.current_goal = goal
-        else: #active sampling using SAGG_RIAC
+        else: #active sampling using RIAC
             goal = self.act_goal_sampling.sample_goal()
             self.current_goal = goal
 
