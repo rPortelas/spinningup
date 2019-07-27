@@ -284,7 +284,7 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         # Step the env
 
         o2, r, d, _ = env.step(a)
-        env.render()
+        #env.render()
 
         o2 = norm(o2) if norm_obs else o2
         ep_ret += r
