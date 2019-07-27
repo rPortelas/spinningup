@@ -53,6 +53,7 @@ class InterestGMM():
         self.warm_start = False if "warm_start" not in params else params["warm_start"]
         self.gmm_fitness_fun = "bic" if "gmm_fitness_fun" not in params else params["gmm_fitness_fun"]
         self.use_weighted_gmm = False if "weighted_gmm" not in params else True
+        self.nb_em_init = 1 if "nb_em_init" not in params else params['nb_em_init']
         # print(self.warm_start)
         # print(self.gmm_fitness_fun)
         # print(self.potential_ks[0])
@@ -63,10 +64,10 @@ class InterestGMM():
         self.goals = []
         self.lps = []
         self.goals_lps = []
-        self.fit_rate = 250
-        self.nb_random = 250
+        self.fit_rate = 250 if "fit_rate" not in params else params['fit_rate']
+        self.nb_random = self.fit_rate
         self.random_goal_ratio = random_goal_ratio
-        self.window = 250
+        self.window = self.fit_rate
 
         # init GMMs
         self.potential_gmms = [self.init_gmm(k) for k in self.potential_ks]
@@ -81,7 +82,7 @@ class InterestGMM():
                    warm_start=self.warm_start)
         else:
             return GMM(n_components=nb_gaussians, covariance_type='full', random_state=self.seed,
-                                            warm_start=self.warm_start)
+                                            warm_start=self.warm_start, n_init=self.nb_em_init)
 
 
     def get_nb_gmm_params(self, gmm):
