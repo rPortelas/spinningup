@@ -399,9 +399,11 @@ if __name__ == '__main__':
     parser.add_argument('--nb_rand_dim', type=int, default=0)
     # alp-gmm related arguments
     parser.add_argument('--gmm_fitness_fun', '-fit', type=str, default=None)
+    parser.add_argument('--nb_em_init', type=int, default=None)
     parser.add_argument('--min_k', type=int, default=None)
     parser.add_argument('--max_k', type=int, default=None)
     parser.add_argument('--weighted_gmm','-wgmm', action='store_true')
+
 
     args = parser.parse_args()
 
@@ -423,6 +425,8 @@ if __name__ == '__main__':
             params['potential_ks'] = np.arange(args.min_k, args.max_k,1)
         if args.weighted_gmm is True:
             params['weighted_gmm'] = args.weighted_gmm
+        if args.nb_em_init is not None:
+            params['nb_em_init'] = args.nb_em_init
 
 
     env_kwargs = {'roughness':args.roughness,
