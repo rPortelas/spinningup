@@ -402,6 +402,7 @@ if __name__ == '__main__':
     parser.add_argument('--nb_em_init', type=int, default=None)
     parser.add_argument('--min_k', type=int, default=None)
     parser.add_argument('--max_k', type=int, default=None)
+    parser.add_argument('--fit_rate', type=int, default=None)
     parser.add_argument('--weighted_gmm','-wgmm', action='store_true')
 
 
@@ -427,6 +428,8 @@ if __name__ == '__main__':
             params['weighted_gmm'] = args.weighted_gmm
         if args.nb_em_init is not None:
             params['nb_em_init'] = args.nb_em_init
+        if args.fit_rate is not None:
+            params['fit_rate'] = args.fit_rate
 
 
     env_kwargs = {'roughness':args.roughness,
