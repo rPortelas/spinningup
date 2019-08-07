@@ -175,8 +175,8 @@ class EnvParamsSelector(object):
             self.goal_generator = BaselineGoalGenerator(env_babbling, self.train_env_kwargs)
         # elif env_babbling == 'sagg_iac':
         #     self.goal_generator = SAGG_IAC(mins, maxs, seed=seed)
-        elif env_babbling == 'sagg_riac':
-            self.goal_generator = RIAC(mins, maxs, seed=seed)
+        elif env_babbling == 'riac':
+            self.goal_generator = RIAC(mins, maxs, seed=seed, params=teacher_params)
         elif env_babbling == 'gmm':
             self.goal_generator = InterestGMM(mins, maxs, seed=seed, params=teacher_params)
         elif env_babbling == 'bmm':
@@ -232,7 +232,7 @@ class EnvParamsSelector(object):
     def record_train_episode(self, reward, ep_len):
         self.env_train_rewards.append(reward)
         self.env_train_len.append(ep_len)
-        if (self.env_babbling == 'bmm') or (self.env_babbling == 'gmm') or (self.env_babbling == 'sagg_riac'):
+        if (self.env_babbling == 'bmm') or (self.env_babbling == 'gmm') or (self.env_babbling == 'riac'):
             reward = np.interp(reward, (-150, 350), (0, 1))
             self.env_train_norm_rewards.append(reward)
         self.goal_generator.update(self.get_env_params_vec(self.env_params_train),
@@ -258,7 +258,7 @@ class EnvParamsSelector(object):
     def set_env_params(self, env, kwargs):
         params = self.goal_generator.sample_goal(kwargs)
         if (self.env_babbling == 'gmm') \
-            or (self.env_babbling == 'sagg_riac')\
+            or (self.env_babbling == 'riac')\
             or (self.env_babbling == 'bmm'):
             algo_params = copy.copy(params)
             params = {'tunnel_height':None, 'stump_height':None, 'stump_width':None,

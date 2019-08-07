@@ -54,6 +54,7 @@ class InterestGMM():
         self.gmm_fitness_fun = "bic" if "gmm_fitness_fun" not in params else params["gmm_fitness_fun"]
         self.use_weighted_gmm = False if "weighted_gmm" not in params else True
         self.nb_em_init = 1 if "nb_em_init" not in params else params['nb_em_init']
+        self.multiply_lp = False if "multiply_lp" not in params else params['multiply_lp']
         # print(self.warm_start)
         # print(self.gmm_fitness_fun)
         # print(self.potential_ks[0])
@@ -104,7 +105,10 @@ class InterestGMM():
             if self.normalize_reward:
                 c = np.interp(c,[0,1],[0,self.max_reward])
             self.lps.append(self.lp_computer.get_lp(g, c))
-            self.goals_lps.append(np.array(g.tolist()+[self.lps[-1]]))
+            if self.multiply_lp:
+                self.goals_lps.append(np.array(g.tolist()+[self.lps[-1]]*len(self.mins)))
+            else:
+                self.goals_lps.append(np.array(g.tolist() + [self.lps[-1]]))
 
         #re-fit
         if len(self.goals) >= self.nb_random:
@@ -153,7 +157,11 @@ class InterestGMM():
                 # sample gaussian
                 idx = proportional_choice(self.lp_means, eps=0.0)
                 # sample goal in gaussian, without forgetting to remove learning progress dimension
-                new_goal = np.random.multivariate_normal(self.gmm.means_[idx], self.gmm.covariances_[idx])[:-1]
+                if self.multiply_lp:
+                    d = len(self.mins)
+                    new_goal = np.random.multivariate_normal(self.gmm.means_[idx], self.gmm.covariances_[idx])[:-d]
+                else:
+                    new_goal = np.random.multivariate_normal(self.gmm.means_[idx], self.gmm.covariances_[idx])[:-1]
                 new_goals.append(np.clip(new_goal, self.mins, self.maxs))
 
         if n_samples == 1:

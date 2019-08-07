@@ -404,6 +404,10 @@ if __name__ == '__main__':
     parser.add_argument('--max_k', type=int, default=None)
     parser.add_argument('--fit_rate', type=int, default=None)
     parser.add_argument('--weighted_gmm','-wgmm', action='store_true')
+    parser.add_argument('--multiply_lp', '-lpm', action='store_true')
+    # riac related arguments
+    parser.add_argument('--max_region_size', type=int, default=None)
+    parser.add_argument('--lp_window_size', type=int, default=None)
 
 
     args = parser.parse_args()
@@ -430,6 +434,13 @@ if __name__ == '__main__':
             params['nb_em_init'] = args.nb_em_init
         if args.fit_rate is not None:
             params['fit_rate'] = args.fit_rate
+        if args.multiply_lp is True:
+            params['multiply_lp'] = args.multiply_lp
+    elif args.env_babbling == "riac":
+        if args.max_region_size is not None:
+            params['max_region_size'] = args.max_region_size
+        if args.lp_window_size is not None:
+            params['lp_window_size'] = args.lp_window_size
 
 
     env_kwargs = {'roughness':args.roughness,

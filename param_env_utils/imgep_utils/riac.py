@@ -68,7 +68,6 @@ class RIAC():
             seed = np.random.randint(42,424242)
         np.random.seed(seed)
         self.hyperparams = locals()
-        print(locals())
 
     def compute_interest(self, sub_region):
         if len(sub_region[0]) > 2:
