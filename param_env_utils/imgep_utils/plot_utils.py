@@ -177,6 +177,13 @@ def plot_gmm(weights, means, covariances, X, ax=None, xlim=[0,1], ylim=[0,1],
     ax.tick_params(axis='both', which='major', labelsize=ft_off + 0)
     ax.set_aspect('equal', 'box')
 
+def draw_lineworld_info(ax, start_points, end_points, current_states):
+    for j in range(start_points.shape[0]):
+        #print('start {} stop {}'.format(self.start_points[j,:], self.end_points[j,:]))
+        ax.plot([start_points[j,0], end_points[j,0]],
+                [start_points[j, 1], end_points[j, 1]])
+        ax.scatter(current_states[j][0], current_states[j][1], c='r', s=30, zorder=2)
+
 def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None,
                  xlim=[0,1], ylim=[0,1], fig_size=(9,6), save_imgs=False, title=True, bar=True):
     plt.ioff()
@@ -200,6 +207,8 @@ def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None,
                      ax=ax, xlim=xlim, ylim=ylim, bar=bar)  #add gen_size to have gmm + the points that they generated, not they fitted
             if 'comp_grid' in bk:  # add competence grid info
                 draw_competence_grid(ax,bk['comp_grids'][i], bk['comp_xs'][i], bk['comp_ys'][i])
+            if 'start_points' in bk:  # add lineworld info
+                draw_lineworld_info(ax, bk['start_points'], bk['end_points'], bk['current_states'][i])
             f_name = gifdir+tmpdir+gifname+"_{}.png".format(ep)
             if title:
                 plt.suptitle('Episode {} | nb Gaussians:{}'.format(ep,len(means)), fontsize=20)

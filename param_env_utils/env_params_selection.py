@@ -5,7 +5,7 @@ import copy
 from param_env_utils.active_goal_sampling import SAGG_IAC
 from param_env_utils.imgep_utils.riac import RIAC
 from param_env_utils.imgep_utils.gmm import InterestGMM
-from param_env_utils.imgep_utils.baranes_gmm import BaranesGMM
+from param_env_utils.imgep_utils.covar_gmm import CovarGMM
 from param_env_utils.test_utils import get_test_set_name
 
 
@@ -180,7 +180,7 @@ class EnvParamsSelector(object):
         elif env_babbling == 'gmm':
             self.goal_generator = InterestGMM(mins, maxs, seed=seed, params=teacher_params)
         elif env_babbling == 'bmm':
-            self.goal_generator = BaranesGMM(mins, maxs, seed=seed)
+            self.goal_generator = CovarGMM(mins, maxs, seed=seed)
         else:
             print('Unknown env babbling')
             raise NotImplementedError

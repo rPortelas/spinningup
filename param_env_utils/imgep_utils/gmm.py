@@ -49,9 +49,9 @@ class InterestGMM():
         if self.normalize_reward:
             self.max_reward = np.max(np.array(maxs) - np.array(mins)) # reward is scaled according to largest goal space
 
-        self.potential_ks = np.arange(1,11,1) if "potential_ks" not in params else params["potential_ks"]
+        self.potential_ks = np.arange(2,11,1) if "potential_ks" not in params else params["potential_ks"]
         self.warm_start = False if "warm_start" not in params else params["warm_start"]
-        self.gmm_fitness_fun = "bic" if "gmm_fitness_fun" not in params else params["gmm_fitness_fun"]
+        self.gmm_fitness_fun = "aic" if "gmm_fitness_fun" not in params else params["gmm_fitness_fun"]
         self.use_weighted_gmm = False if "weighted_gmm" not in params else True
         self.nb_em_init = 1 if "nb_em_init" not in params else params['nb_em_init']
         self.multiply_lp = False if "multiply_lp" not in params else params['multiply_lp']
