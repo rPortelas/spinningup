@@ -420,9 +420,9 @@ if batch_exp:
     exp_args = [{"id":"2d001", "nb_episodes":nb_eps*2, "eps":0.01, "nb_dims":2, "algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names},
                 {"id":"5d01", "nb_episodes":nb_eps*2, "eps":0.1, "nb_dims":5, "algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names},
                 {"id":"10d035", "nb_episodes":nb_eps*3, "eps":0.35, "nb_dims":10,"algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names},
-                {"id":"20d075", "nb_episodes":nb_eps*3, "eps":0.75, "nb_dims":10,"algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names},
-                {"id":"50d191", "nb_episodes":nb_eps*3, "eps":1.91, "nb_dims":10,"algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names},
-                {"id":"100d315", "nb_episodes":nb_eps*3, "eps":3.15, "nb_dims":10,"algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names}]
+                {"id":"20d075", "nb_episodes":nb_eps*3, "eps":0.75, "nb_dims":20,"algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names},
+                {"id":"50d191", "nb_episodes":nb_eps*3, "eps":1.91, "nb_dims":50,"algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names},
+                {"id":"100d315", "nb_episodes":nb_eps*3, "eps":3.15, "nb_dims":100,"algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names}]
 
     if len(sys.argv) != 2:
         print('launching all experiences')
