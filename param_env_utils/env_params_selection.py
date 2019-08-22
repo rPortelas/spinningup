@@ -180,7 +180,7 @@ class EnvParamsSelector(object):
         elif env_babbling == 'gmm':
             self.goal_generator = InterestGMM(mins, maxs, seed=seed, params=teacher_params)
         elif env_babbling == 'bmm':
-            self.goal_generator = CovarGMM(mins, maxs, seed=seed)
+            self.goal_generator = CovarGMM(mins, maxs, seed=seed, params=teacher_params)
         else:
             print('Unknown env babbling')
             raise NotImplementedError

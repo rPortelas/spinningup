@@ -405,6 +405,8 @@ if __name__ == '__main__':
     parser.add_argument('--fit_rate', type=int, default=None)
     parser.add_argument('--weighted_gmm','-wgmm', action='store_true')
     parser.add_argument('--multiply_lp', '-lpm', action='store_true')
+    # covar-gmm related arguments
+    parser.add_argument('--absolute_lp', '-alp', action='store_true')
     # riac related arguments
     parser.add_argument('--max_region_size', type=int, default=None)
     parser.add_argument('--lp_window_size', type=int, default=None)
@@ -436,6 +438,9 @@ if __name__ == '__main__':
             params['fit_rate'] = args.fit_rate
         if args.multiply_lp is True:
             params['multiply_lp'] = args.multiply_lp
+    elif args.env_babbling == 'bmm':
+        if args.absolute_lp is True:
+            params['absolute_lp'] = args.absolute_lp
     elif args.env_babbling == "riac":
         if args.max_region_size is not None:
             params['max_region_size'] = args.max_region_size
