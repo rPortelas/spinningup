@@ -9,7 +9,8 @@ class CovarGMM():
     def __init__(self, mins, maxs, n_components=None, seed=None, random_goal_ratio=0.2, params={}):
         self.seed = seed
         if not seed:
-            self.seed = np.random.randint(np.random.randint(42,424242))
+            self.seed = np.random.randint(42,424242)
+        np.random.seed(self.seed)
         self.mins = mins
         self.maxs = maxs
         self.random_goal_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
