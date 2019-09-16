@@ -1,26 +1,29 @@
 import numpy as np
 import scipy.stats as sp
 import time
-from param_env_utils.active_goal_sampling import SAGG_IAC
+#from param_env_utils.active_goal_sampling import SAGG_IAC
 from param_env_utils.imgep_utils.riac import RIAC
 from param_env_utils.imgep_utils.florensa_riac import Florensa_RIAC
 from param_env_utils.imgep_utils.gmm import InterestGMM
-from param_env_utils.imgep_utils.baranes_gmm import BaranesGMM
+from param_env_utils.imgep_utils.covar_gmm import CovarGMM
+#from param_env_utils.imgep_utils.egep import EGEP
+#from param_env_utils.imgep_utils.hgmm import HGMM
 #from param_env_utils.imgep_utils.cma_es import InterestCMAES
 import pickle
 import copy
 import sys
 from collections import OrderedDict
 #import cProfile
+#from param_env_utils.imgep_utils.plot_utils import egep_plot_gif, hgmm_plot_gif
 
 class NDummyEnv(object):  # n-dimensional grid
-    def __init__(self, nb_cells=10, ndims=2, noise=0.0, nb_rand_dims=0, forget=False):
+    def __init__(self, nb_cells=10, nb_dims=2, noise=0.0, nb_rand_dims=0, forget=False):
         self.nb_cells = nb_cells
-        self.nb_total_cells = nb_cells ** ndims
+        self.nb_total_cells = nb_cells ** nb_dims
         self.step_size = 1/nb_cells
-        self.bnds = [np.arange(0,1+self.step_size,self.step_size) for i in range(ndims)]
+        self.bnds = [np.arange(0,1+self.step_size,self.step_size) for i in range(nb_dims)]
         self.points = []
-        self.cell_counts = np.zeros((nb_cells, ) * ndims)
+        self.cell_counts = np.zeros((nb_cells, ) * nb_dims)
         self.cell_competence = self.cell_counts.copy()
         self.forget = forget
         if self.forget:
@@ -30,8 +33,8 @@ class NDummyEnv(object):  # n-dimensional grid
         self.noise = noise
         self.max_per_cell = 100
         self.nb_random_dims = nb_rand_dims
-        self.ndims = ndims
-        self.all_ndims = ndims + self.nb_random_dims
+        self.nb_dims = nb_dims
+        self.all_nb_dims = nb_dims + self.nb_random_dims
 
 
     def get_score(self):
@@ -39,13 +42,13 @@ class NDummyEnv(object):  # n-dimensional grid
         return (len(score[0]) / self.nb_total_cells)*100
 
     def episode(self, point):
-        assert(len(point) == self.all_ndims)
+        assert(len(point) == self.all_nb_dims)
         for v in point:
             if (v < 0.0) or (v > 1.0):
                 #print("OUT OF BOUNDS")
                 self.points.append(point)
                 return 0.
-        pts = point[0:self.ndims]  # discard random dimensions
+        pts = point[0:self.nb_dims]  # discard random dimensions
         self.points.append(pts)
         # find in which cell pts falls and add to total cell counts
         arr_pts = np.array([pts])
@@ -84,7 +87,7 @@ class NDummyEnv(object):  # n-dimensional grid
                 # then substract only where there is already competence
                 self.cell_competence = np.clip(self.cell_competence - self.cell_forget, 0, np.inf)
                 # reset cell forget
-                self.cell_forget = np.zeros((self.nb_cells, ) * self.ndims)
+                self.cell_forget = np.zeros((self.nb_cells, ) * self.nb_dims)
 
 
 
@@ -93,14 +96,14 @@ class NDummyEnv(object):  # n-dimensional grid
         #     normalized_competence = np.clip(normalized_competence + np.random.normal(0,self.noise), 0, 1)
         return normalized_competence
 
-def test_riac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True, params={}):
+def test_riac(env, nb_episodes, gif=True, nb_dims=2, score_step=1000, verbose=True, params={}):
     if 'use_florensa' in params:
         print('florensuse')
-        goal_generator = Florensa_RIAC(np.array([0.0] * ndims),
-                              np.array([1.0] * ndims), params=params)
+        goal_generator = Florensa_RIAC(np.array([0.0] * nb_dims),
+                              np.array([1.0] * nb_dims), params=params)
     else:
-        goal_generator = RIAC(np.array([0.0] * ndims),
-                              np.array([1.0]*ndims), params=params)
+        goal_generator = RIAC(np.array([0.0] * nb_dims),
+                              np.array([1.0]*nb_dims), params=params)
     all_boxes = []
     iterations = []
     interests = []
@@ -109,7 +112,7 @@ def test_riac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True
     for i in range(nb_episodes+1):
         if (i % score_step) == 0:
             scores.append(env.get_score())
-            if ndims == 2:
+            if nb_dims == 2:
                 if verbose:
                     print(env.cell_competence)
             else:
@@ -133,8 +136,8 @@ def test_riac(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True
                         gifname='dummysaggriac', ep_len=[1]*nb_episodes, rewards=rewards, gifdir='gifs/')
     return scores
 
-def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True, params={}):
-    goal_generator = InterestGMM([0]*ndims, [1]*ndims, params=params)
+def test_interest_gmm(env, nb_episodes, gif=True, nb_dims=2, score_step=1000, verbose=True, params={}):
+    goal_generator = InterestGMM([0]*nb_dims, [1]*nb_dims, params=params)
     rewards = []
     scores = []
     bk = {'weights':[], 'covariances':[], 'means':[], 'goals_lps':[], 'episodes':[],
@@ -142,7 +145,7 @@ def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verb
     for i in range(nb_episodes+1):
         if (i % score_step) == 0:
             scores.append(env.get_score())
-            if ndims == 2:
+            if nb_dims == 2:
                 if verbose:
                     print(env.cell_competence)
             else:
@@ -154,7 +157,7 @@ def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verb
             bk['means'].append(goal_generator.gmm.means_.copy())
             bk['goals_lps'] = goal_generator.goals_lps
             bk['episodes'].append(i)
-            if ndims == 2:
+            if nb_dims == 2:
                 bk['comp_grids'].append(env.cell_competence.copy())
                 bk['comp_xs'].append(env.bnds[0].copy())
                 bk['comp_ys'].append(env.bnds[1].copy())
@@ -167,8 +170,8 @@ def test_interest_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verb
         gmm_plot_gif(bk, gifname='gmm'+str(time.time()), gifdir='gifs/')
     return scores
 
-def test_interest_gmm_aic(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
-    goal_generator = InterestGMM([0]*ndims, [1]*ndims, gmm_fitness_fun='aic')
+def test_covar_gmm(env, nb_episodes, gif=True, nb_dims=2, score_step=1000, verbose=True):
+    goal_generator = CovarGMM([0] * nb_dims, [1] * nb_dims)
     rewards = []
     scores = []
     bk = {'weights':[], 'covariances':[], 'means':[], 'goals_lps':[], 'episodes':[],
@@ -176,41 +179,7 @@ def test_interest_gmm_aic(env, nb_episodes, gif=True, ndims=2, score_step=1000, 
     for i in range(nb_episodes+1):
         if (i % score_step) == 0:
             scores.append(env.get_score())
-            if ndims == 2:
-                if verbose:
-                    print(env.cell_competence)
-            else:
-                if verbose:
-                    print(scores[-1])
-        if i>100 and (i % goal_generator.fit_rate) == 0 and (gif is True):
-            bk['weights'].append(goal_generator.gmm.weights_.copy())
-            bk['covariances'].append(goal_generator.gmm.covariances_.copy())
-            bk['means'].append(goal_generator.gmm.means_.copy())
-            bk['goals_lps'] = goal_generator.goals_lps
-            bk['episodes'].append(i)
-            if ndims == 2:
-                bk['comp_grids'].append(env.cell_competence.copy())
-                bk['comp_xs'].append(env.bnds[0].copy())
-                bk['comp_ys'].append(env.bnds[1].copy())
-
-        goal = goal_generator.sample_goal()
-        comp = env.episode(goal)
-        goal_generator.update([np.array(goal)], [comp])
-        rewards.append(comp)
-    if gif:
-        gmm_plot_gif(bk, gifname='gmm'+str(time.time()), gifdir='gifs/')
-    return scores
-
-def test_baranes_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbose=True):
-    goal_generator = BaranesGMM([0]*ndims, [1]*ndims)
-    rewards = []
-    scores = []
-    bk = {'weights':[], 'covariances':[], 'means':[], 'goals_lps':[], 'episodes':[],
-          'comp_grids':[], 'comp_xs':[], 'comp_ys':[]}
-    for i in range(nb_episodes+1):
-        if (i % score_step) == 0:
-            scores.append(env.get_score())
-            if ndims == 2:
+            if nb_dims == 2:
                 if verbose:
                     print(env.cell_competence)
             else:
@@ -222,7 +191,7 @@ def test_baranes_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbo
             bk['means'].append(goal_generator.gmm.means_.copy())
             bk['goals_lps'] = goal_generator.goals_times_comps
             bk['episodes'].append(i)
-            if ndims == 2:
+            if nb_dims == 2:
                 bk['comp_grids'].append(env.cell_competence.copy())
                 bk['comp_xs'].append(env.bnds[0].copy())
                 bk['comp_ys'].append(env.bnds[1].copy())
@@ -235,61 +204,80 @@ def test_baranes_gmm(env, nb_episodes, gif=True, ndims=2, score_step=1000, verbo
         gmm_plot_gif(bk, gifname='baranesgmm'+str(time.time()), gifdir='gifs/')
     return scores
 
-def test_CMAES(env, nb_episodes, gif=True, score_step=1000):
-    print("cmaes run")
-    pop_s = 250
-    goal_generator = InterestCMAES(2, popsize=pop_s, sigma_init=0.5)
-    bk = {'covariances': [], 'means': [], 'goals': [], 'episodes': [], 'interests':[], 'sigmas':[]}
-    for i in range(nb_episodes+1):
-        if (i % 1000) == 0:
-            if ndims == 2:
-                print(env.cell_competence)
-            else:
-                print(env.get_score())
+# def test_egep(env, nb_episodes, gif=False, nb_dims=2, score_step=1000, verbose=True, params={}):
+#     goal_generator = EGEP([0]*nb_dims, [1]*nb_dims, params=params)
+#     rewards = []
+#     scores = []
+#     bk = {"elites_idx":[], 'comp_grids':[], 'comp_xs':[], 'comp_ys':[]}
+#     for i in range(nb_episodes+1):
+#         if (i % score_step) == 0:
+#             #print(i)
+#             scores.append(env.get_score())
+#             if verbose:
+#                 print(scores[-1])
+#             bk["elites_idx"].append(copy.copy(goal_generator.elite_tasks_idx))
+#             if nb_dims == 2:
+#                 bk['comp_grids'].append(env.cell_competence.copy())
+#                 bk['comp_xs'].append(env.bnds[0].copy())
+#                 bk['comp_ys'].append(env.bnds[1].copy())
+#
+#         goal = goal_generator.sample_goal()
+#         comp = env.episode(goal)
+#         goal_generator.update(np.array(goal), comp)
+#         rewards.append(comp)
+#     bk['tasks'] = goal_generator.tasks
+#     bk['lps'] = goal_generator.tasks_lps
+#     if gif:
+#         egep_plot_gif(bk, gifname='egep'+str(time.time()), gifdir='gifs/')
+#     return scores
 
-        #goal = np.clip(goal_generator.sample_goal(),0,1)
-        goal = np.array(goal_generator.sample_goal())
-        #print(goal)
-        if goal_generator.counter == (goal_generator.popsize - 1):  # just generated new population, record stuff
-            bk['covariances'].append(goal_generator.es.C.copy())
-            bk['means'].append(goal_generator.es.mean.copy())
-            bk['episodes'].append(i)
-            bk['sigmas'].append(goal_generator.es.sigma)
-            # plot_cmaes(bk['means'][-1],
-            #          bk['covariances'][-1],
-            #          bk['interests'],
-            #          np.array(bk['goals']))
-            # plt.show(block=False)
-            # plt.pause(0.5)
-            # plt.close()
+# def test_hgmm(env, nb_episodes, gif=True, nb_dims=2, score_step=1000, verbose=True, params={}):
+#     goal_generator = HGMM([0]*nb_dims, [1]*nb_dims, params=params)
+#     rewards = []
+#     scores = []
+#     bk = {'comp_grids':[], 'comp_xs':[], 'comp_ys':[]}
+#     for i in range(nb_episodes+1):
+#         if (i % score_step) == 0:
+#             scores.append(env.get_score())
+#             if nb_dims == 2:
+#                 if verbose:
+#                     print(env.cell_competence)
+#             else:
+#                 if verbose:
+#                     print(scores[-1])
+#         if i>100 and (i % goal_generator.fit_rate) == 0 and (gif is True):
+#             if nb_dims == 2:
+#                 bk['comp_grids'].append(env.cell_competence.copy())
+#                 bk['comp_xs'].append(env.bnds[0].copy())
+#                 bk['comp_ys'].append(env.bnds[1].copy())
+#
+#         goal = goal_generator.sample_goal()
+#         comp = env.episode(goal)
+#         goal_generator.update(np.array(goal), comp)
+#         rewards.append(comp)
+#     if gif:
+#         goal_generator.dump(bk)
+#         hgmm_plot_gif(bk, gifname='Hgmm'+str(time.time()), gifdir='gifs/')
+#     return scores
 
-        comp = env.episode(goal)
-        #print("goal{}".format(goal))
-        goal_generator.update(np.array(goal), comp)
-        bk['interests'].append(goal_generator.current_fitnesses[-1])
-        bk['goals'].append(goal.copy())
-    if gif:
-        cmaes_plot_gif(bk, gifname='cmaes' + str(time.time()), gifdir='gifs/')
-    return env.get_score()
-
-def test_random(env, nb_episodes, ndims=2, gif=False, score_step=1000, verbose=True):
+def test_random(env, nb_episodes, nb_dims=2, gif=False, score_step=1000, verbose=True):
     scores = []
     for i in range(nb_episodes+1):
         if (i % score_step) == 0:
             scores.append(env.get_score())
-            if ndims == 2:
+            if nb_dims == 2:
                 if verbose:
                     print(env.cell_competence)
             else:
                 if verbose:
                     print(scores[-1])
-        p = np.random.random(ndims)
+        p = np.random.random(nb_dims)
         env.episode(p)
     return scores
 
 
-def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=None,
-              nb_seeds=100, noise=0.0, nb_cells=10, id="test", params={}, names=[]):
+def run_stats(nb_episodes=20000, nb_dims=2, nb_rand_dims = 0, algo_fs=None,
+              nb_seeds=100, noise=0.0, nb_cells=10, id="test", params={}, names=[], save=True):
     print("starting stats on {}".format(id))
     algo_results, algo_times = [[] for _ in range(len(algo_fs))], [[] for _ in range(len(algo_fs))]
     if len(names) == 0:
@@ -297,9 +285,9 @@ def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=None,
     for i in range(nb_seeds):
         print(i)
         for j in range(len(algo_fs)):
-            env = NDummyEnv(ndims=ndims, nb_rand_dims=nb_rand_dims, noise=noise, nb_cells=nb_cells)
+            env = NDummyEnv(nb_dims=nb_dims, nb_rand_dims=nb_rand_dims, noise=noise, nb_cells=nb_cells)
             start = time.time()
-            algo_results[j].append(algo_fs[j](env, nb_episodes, ndims=ndims+nb_rand_dims, gif=False, verbose=False, params=params[j]))
+            algo_results[j].append(algo_fs[j](env, nb_episodes, nb_dims=nb_dims+nb_rand_dims, gif=False, verbose=False, params=params[j]))
             end = time.time()
             algo_times[j].append(round(end-start))
 
@@ -308,9 +296,9 @@ def run_stats(nb_episodes=20000, ndims=2, nb_rand_dims = 0, algo_fs=None,
         print("{}:{}: scores -> mu:{},sig{} | times -> mu:{},sig{}".format(id, names[i], np.mean(scores,axis=0)[-1],
                                                                            np.std(scores, axis=0)[-1],
                                                                            np.mean(times), np.std(times)))
-
-    data = [algo_results, algo_times, names, nb_episodes]
-    pickle.dump(data, open("dummy_env_save_{}.pkl".format(id), "wb"))
+    if save:
+        data = [algo_results, algo_times, names, nb_episodes]
+        pickle.dump(data, open("dummy_env_save_{}.pkl".format(id), "wb"))
 
 def load_stats(id="test",fnum=0):
     from param_env_utils.imgep_utils.plot_utils import region_plot_gif, plot_gmm, gmm_plot_gif
@@ -437,83 +425,123 @@ def load_stats_camera_ready(id="test",fnum=0):
 
 
 
+
 if __name__=="__main__":
-    # nb_episodes = 20000
-    # nb_rand_dims = 10
-    # ndims = 2
-    # env = NDummyEnv(ndims=ndims, nb_rand_dims=nb_rand_dims)
-    # test_interest_gmm(env, nb_episodes, ndims=ndims+nb_rand_dims, gif=False)
-    # #test_CMAES(env, nb_episodes, gif=True)
-    # # env = DummyEnv()
-    # #score = test_random(env, nb_episodes, ndims=ndims)
-    # # print(score)
-    # #env.render()
-    # #
 
-    nb_eps = 100000
-    nb_seeds = 30
-    #algos = (test_interest_gmm, test_interest_gmm, test_interest_gmm, test_interest_gmm, test_interest_gmm, test_interest_gmm)
-    #names = ["gmm_aic"        , "gmm"            , "gmm_ws"         , "gmm3"            , "gmm6", "gmm9"]
-    #params = [{"gmm_fitness_fun":"aic"}, {}      , {"warm_start":True}, {"potential_ks":np.arange(3,11,1)}, {"potential_ks":np.arange(6,11,1)}, {"potential_ks":np.arange(9,11,1)}]
-    algos = (test_riac, test_riac, test_riac, test_riac, test_riac, test_riac)
-    names = ["our_iac",
-             "vanilla_riac",
-             "florensa_riac",
-             "florensa_riac_our_params",
-             "our_riac",
-             "our_riac_their_params"]
-    params = [{"sampling_in_leaves_only":True},
-              {"min_reg_size":1, "min_dims_range_ratio":1/np.inf},
-              {"use_florensa":True},
-              {"use_florensa":True, "max_region_size":200, "lp_window_size":200},
-              {},
-              {"max_region_size":500, "lp_window_size":100}]
-    #algos = (test_sagg_riac, test_interest_gmm, test_baranes_gmm, test_random)
-    # exp_args = [{"id":"2d10cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds},
-    #             {"id": "4d4cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 4},
-    #              {"id": "5d4cells", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "ndims": 5},
-    #             {"id": "6d4cells", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "ndims": 6},
-    #             {"id": "2d20cellslong", "nb_episodes": nb_eps * 2, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 20},
-    #             {"id": "2d50cellslong", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 50},
-    #             {"id": "2d100cellslong", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 100},
-    #             {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10},
-    #             {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20},
-    #             {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50}]
+    batch_exps = True
+    if batch_exps:
+        nb_eps = 10000
+        nb_seeds = 1
+        #algos = (test_interest_gmm, test_interest_gmm, test_interest_gmm, test_interest_gmm, test_interest_gmm, test_interest_gmm)
+        #names = ["gmm_aic"        , "gmm"            , "gmm_ws"         , "gmm3"            , "gmm6", "gmm9"]
+        #params = [{"gmm_fitness_fun":"aic"}, {}      , {"warm_start":True}, {"potential_ks":np.arange(3,11,1)}, {"potential_ks":np.arange(6,11,1)}, {"potential_ks":np.arange(9,11,1)}]
 
-    exp_args = [{"id":"2d10cells_us_vs_Florensa", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names},
-                {"id": "4d4cells_us_vs_Florensa", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"ndims": 4, "params": params, "names":names},
-                {"id": "5d4cells_us_vs_Florensa", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "ndims": 5, "params": params, "names":names},
-                {"id": "6d4cells_us_vs_Florensa", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "ndims": 6, "params": params, "names":names},
-                {"id": "2d20cellslong_us_vs_Florensa", "nb_episodes": nb_eps * 2, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 20, "params": params, "names":names},
-                {"id": "2d50cellslong_us_vs_Florensa", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 50, "params": params, "names":names},
-                {"id": "2d100cellslong_us_vs_Florensa", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 100, "params": params, "names":names},
-                {"id": "2d10rd_us_vs_Florensa", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10, "params": params, "names":names},
-                {"id": "2d20rd_us_vs_Florensa", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20, "params": params, "names":names},
-                {"id": "2d50rd_us_vs_Florensa", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50, "params": params, "names":names}]
-    # exp_args = [{"id": "2d50rd", "nb_episodes": nb_eps * 2, "algo_fs": [test_interest_gmm], "nb_seeds": nb_seeds, "nb_cells": 4,
-    #              "ndims": 2, "nb_rand_dims":50, "params":[{}]}]
+        # algos = (test_riac, test_riac, test_riac, test_riac, test_riac, test_riac)
+        # names = ["our_iac",
+        #          "vanilla_riac",
+        #          "florensa_riac",
+        #          "florensa_riac_our_params",
+        #          "our_riac",
+        #          "our_riac_their_params"]
+        # params = [{"sampling_in_leaves_only":True},
+        #           {"min_reg_size":1, "min_dims_range_ratio":1/np.inf},
+        #           {"use_florensa":True},
+        #           {"use_florensa":True, "max_region_size":200, "lp_window_size":200},
+        #           {},
+        #           {"max_region_size":500, "lp_window_size":100}]
 
-    if len(sys.argv) != 2:
-        print('launching all experiences')
-        exp_nbs = np.arange(0,len(exp_args))
-    elif int(sys.argv[1]) >= len(exp_args):
-        print(sys.argv[1]+": not an expe")
-        exit(0)
+        # algos = [test_egep]
+        # names = ["egep"]
+        # params = [{}]
+
+        algos = (test_riac, test_interest_gmm, test_covar_gmm, test_random)
+        names = ["RIAC", "ALP-GMM", "Covar_GMM", "Random"]
+        params = [{}, {}, {}, {}]
+
+        exp_args = [{"id":"2d10cells", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "params":params, "names":names},
+                    {"id": "4d4cells", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"nb_dims": 4, "params":params, "names":names},
+                     {"id": "5d4cells", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "nb_dims": 5, "params":params, "names":names},
+                    {"id": "6d4cells", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "nb_dims": 6, "params":params, "names":names},
+                    {"id": "2d20cellslong", "nb_episodes": nb_eps * 2, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 20, "params":params, "names":names},
+                    {"id": "2d50cellslong", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 50, "params":params, "names":names},
+                    {"id": "2d100cellslong", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 100, "params":params, "names":names},
+                    {"id": "2d10rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10, "params":params, "names":names},
+                    {"id": "2d20rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20, "params":params, "names":names},
+                    {"id": "2d50rd", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50, "params":params, "names":names}]
+
+        # exp_args = [{"id":"2d10cells_us_vs_Florensa", "nb_episodes":nb_eps, "algo_fs":algos, "nb_seeds":nb_seeds, "params": params, "names":names},
+        #             {"id": "4d4cells_us_vs_Florensa", "nb_episodes": nb_eps*2, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4,"nb_dims": 4, "params": params, "names":names},
+        #             {"id": "5d4cells_us_vs_Florensa", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "nb_dims": 5, "params": params, "names":names},
+        #             {"id": "6d4cells_us_vs_Florensa", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_cells": 4, "nb_dims": 6, "params": params, "names":names},
+        #             {"id": "2d20cellslong_us_vs_Florensa", "nb_episodes": nb_eps * 2, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 20, "params": params, "names":names},
+        #             {"id": "2d50cellslong_us_vs_Florensa", "nb_episodes": nb_eps * 5, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 50, "params": params, "names":names},
+        #             {"id": "2d100cellslong_us_vs_Florensa", "nb_episodes": nb_eps * 10, "algo_fs": algos, "nb_seeds": nb_seeds,"nb_cells": 100, "params": params, "names":names},
+        #             {"id": "2d10rd_us_vs_Florensa", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 10, "params": params, "names":names},
+        #             {"id": "2d20rd_us_vs_Florensa", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 20, "params": params, "names":names},
+        #             {"id": "2d50rd_us_vs_Florensa", "nb_episodes": nb_eps, "algo_fs": algos, "nb_seeds": nb_seeds, "nb_rand_dims": 50, "params": params, "names":names}]
+        #exp_args = [{"id": "4d4cellsegep", "nb_episodes": 150000, "algo_fs": algos, "nb_seeds": 30, "nb_cells": 4,"nb_dims": 4, "params": params, "names":names}]
+
+        if len(sys.argv) != 2:
+            print('launching all experiences')
+            exp_nbs = np.arange(0,len(exp_args))
+        elif int(sys.argv[1]) >= len(exp_args):
+            print(sys.argv[1]+": not an expe")
+            exit(0)
+        else:
+            exp_nbs = [int(sys.argv[1])]
+            print("launching expe" + sys.argv[1] + " : " + exp_args[exp_nbs[0]]["id"])
+
+
+        for i in exp_nbs:
+             run_stats(**exp_args[i])
+
+        # #Display all stats
+        # import matplotlib.pyplot as plt
+        # all_ids = []
+        # for i,exp in enumerate(exp_args):
+        #     all_ids.append(exp["id"])
+        #     load_stats(all_ids[-1], fnum=i)
+        # plt.show()
     else:
-        exp_nbs = [int(sys.argv[1])]
-        print("launching expe" + sys.argv[1] + " : " + exp_args[exp_nbs[0]]["id"])
+        nb_episodes = 5000
+        nb_rand_dims = 0
+        nb_dims = 2
+        env = NDummyEnv(nb_dims=nb_dims, nb_rand_dims=nb_rand_dims)
+        test_hgmm(env, nb_episodes, nb_dims=nb_dims+nb_rand_dims, gif=True, verbose=True)
+        #test_egep(env, nb_episodes, nb_dims=nb_dims+nb_rand_dims, gif=False, verbose=True)
+        #test_CMAES(env, nb_episodes, gif=True)
+        # env = DummyEnv()
+        #score = test_random(env, nb_episodes, nb_dims=nb_dims)
+        # print(score)
+        #env.render()
+        #
 
 
-    for i in exp_nbs:
-         run_stats(**exp_args[i])
-
-    # #Display all stats
-    # import matplotlib.pyplot as plt
-    # all_ids = []
-    # for i,exp in enumerate(exp_args):
-    #     all_ids.append(exp["id"])
-    #     load_stats(all_ids[-1], fnum=i)
-    # plt.show()
+    ############## GRID SEARCH ##############
+    # algo_name = "gmm"
+    # param_dict = {"fit_rate":[50,100,150,200],
+    #           "potential_ks":[np.arange(1,11,1), np.arange(2,11,1), np.arange(3,11,1)],
+    #               "nb_em_init":[1,10]}
+    # results = {}
+    # import itertools
     #
-
-
+    # def product_dict(**kwargs):
+    #     keys = kwargs.keys()
+    #     vals = kwargs.values()
+    #     for instance in itertools.product(*vals):
+    #         yield dict(zip(keys, instance))
+    #
+    # names = []
+    # params = []
+    # algos = []
+    # for p in product_dict(**param_dict):
+    #     params.append(p)
+    #     names.append(algo_name+str(p['fit_rate'])+'_'+str(p['potential_ks'][0]))
+    #     algos.append(test_interest_gmm)
+    #
+    # test_env = {"id": "4d4cells_gs_", "nb_cells": 4,"nb_dims": 4, "nb_episodes": 60000, "nb_seeds": 20, 'names': names, 'algo_fs': algos,
+    #             'params': params}
+    # run_stats(**test_env)
+    #
+    # test_env = {"id": "2d10cells_gs_", "nb_episodes": 20000, "nb_seeds": 20, 'names':names, 'algo_fs':algos, 'params':params}
+    # run_stats(**test_env)
