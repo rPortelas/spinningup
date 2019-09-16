@@ -170,8 +170,8 @@ def test_interest_gmm(env, nb_episodes, gif=True, nb_dims=2, score_step=1000, ve
         gmm_plot_gif(bk, gifname='gmm'+str(time.time()), gifdir='gifs/')
     return scores
 
-def test_covar_gmm(env, nb_episodes, gif=True, nb_dims=2, score_step=1000, verbose=True):
-    goal_generator = CovarGMM([0] * nb_dims, [1] * nb_dims)
+def test_covar_gmm(env, nb_episodes, gif=True, nb_dims=2, score_step=1000, verbose=True, params={}):
+    goal_generator = CovarGMM([0] * nb_dims, [1] * nb_dims, params=params)
     rewards = []
     scores = []
     bk = {'weights':[], 'covariances':[], 'means':[], 'goals_lps':[], 'episodes':[],
@@ -260,7 +260,7 @@ def test_covar_gmm(env, nb_episodes, gif=True, nb_dims=2, score_step=1000, verbo
 #         hgmm_plot_gif(bk, gifname='Hgmm'+str(time.time()), gifdir='gifs/')
 #     return scores
 
-def test_random(env, nb_episodes, nb_dims=2, gif=False, score_step=1000, verbose=True):
+def test_random(env, nb_episodes, nb_dims=2, gif=False, score_step=1000, verbose=True, params={}):
     scores = []
     for i in range(nb_episodes+1):
         if (i % score_step) == 0:
