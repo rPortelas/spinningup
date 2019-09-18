@@ -25,6 +25,9 @@ setup(
         'psutil',
         'scipy',
         'seaborn==0.8.1',
+        'mpi4py',
+        'tensorflow',
+        'treelib',
         'tqdm'
     ],
     description="Teaching tools for introducing people to deep RL.",
