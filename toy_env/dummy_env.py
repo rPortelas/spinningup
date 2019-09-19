@@ -4,7 +4,7 @@ import time
 #from teachers.active_goal_sampling import SAGG_IAC
 from teachers.algos.riac import RIAC
 from teachers.algos.florensa_riac import Florensa_RIAC
-from teachers.algos.gmm import InterestGMM
+from teachers.algos.alp_gmm import InterestGMM
 from teachers.algos.covar_gmm import CovarGMM
 #from teachers.algos.egep import EGEP
 #from teachers.algos.hgmm import HGMM

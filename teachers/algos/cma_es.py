@@ -1,7 +1,7 @@
 import cma
 import numpy as np
 import matplotlib.pyplot as plt
-from param_env_utils.imgep_utils.gmm import EmpiricalLearningProgress
+from teachers.algos.alp_gmm import EmpiricalLearningProgress
 from gym.spaces import Box
 
 def compute_weight_decay(weight_decay, model_param_list):

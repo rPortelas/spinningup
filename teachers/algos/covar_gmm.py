@@ -3,7 +3,14 @@ import seaborn as sns; sns.set()
 from sklearn.mixture import GaussianMixture as GMM
 import numpy as np
 from gym.spaces import Box
-from param_env_utils.imgep_utils.gep_utils import proportional_choice
+
+
+def proportional_choice(v, eps=0.):
+    if np.sum(v) == 0 or np.random.rand() < eps:
+        return np.random.randint(np.size(v))
+    else:
+        probas = np.array(v) / np.sum(v)
+        return np.where(np.random.multinomial(1, probas) == 1)[0][0]
 
 class CovarGMM():
     def __init__(self, mins, maxs, n_components=None, seed=None, random_goal_ratio=0.2, params={}):

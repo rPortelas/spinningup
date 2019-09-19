@@ -1,5 +1,4 @@
 import matplotlib.patches as patches
-from param_env_utils.imgep_utils.gep_utils import scale_vector
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import matplotlib.colorbar as cbar
 import matplotlib.pyplot as plt
@@ -9,6 +8,20 @@ import copy
 import os
 from matplotlib.patches import Ellipse
 import matplotlib.colors as colors
+
+
+# scale numpy 1d array to [-1:1] given its bounds
+# bounds must be of the form [[min1,max1],[min2,max2],...]
+def scale_vector(values, bounds):
+    mins_maxs_diff =  np.diff(bounds).squeeze()
+    mins = bounds[:, 0]
+    return (((values - mins) * 2) / mins_maxs_diff) - 1
+
+def unscale_vector(scaled_values, bounds=[[-1,1]]):
+    mins_maxs_diff =  np.diff(bounds).squeeze()
+    mins = bounds[:, 0]
+    return (((scaled_values + 1) * mins_maxs_diff) / 2) + mins
+
 
 
 def plt_2_rgb(ax):

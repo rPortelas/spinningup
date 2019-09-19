@@ -1,10 +1,11 @@
 import numpy as np
 from gym.spaces import Box
 from collections import deque
-from param_env_utils.imgep_utils.gep_utils import proportional_choice
+from teachers.algos.gep_utils import proportional_choice
 import copy
 from treelib import Tree
 from itertools import islice
+import time
 
 class Region(object):
     def __init__(self, maxlen, cps_gs=None, bounds=None, interest=None):
@@ -19,58 +20,48 @@ class Region(object):
 
         need_split = False
         if is_leaf and (len(self.cps_gs[0]) > self.maxlen):
-            # leaf is full, need split
+            # leaf is full, lets split
             need_split = True
         return need_split
 
 
-class RIAC():
-    def __init__(self, mins, maxs, seed=None, params=dict()):  # example --> mins: [-1,-1] maxs: [1,1]
 
-        assert len(mins) == len(maxs)
-        self.maxlen = 200 if "max_region_size" not in params else params['max_region_size']
-        self.window_cp = self.maxlen if "lp_window_size" not in params else params['lp_window_size']
+
+
+# Implementation of SAGG-RIAC
+class SAGG_BRIAC():
+    def __init__(self, min, max, temperature=20):  # example --> min: [-1,-1] max: [1,1]
+
+        assert len(min) == len(max)
+        self.maxlen = 200
+        self.window_cp = 200
+        self.minlen = self.maxlen / 20
+        self.maxregions = 80
 
         # init regions' tree
         self.tree = Tree()
-        self.regions_bounds = [Box(mins, maxs, dtype=np.float32)]
+        self.regions_bounds = [Box(min, max, dtype=np.float32)]
         self.interest = [0.]
-        self.tree.create_node('root', 'root',
-                              data=Region(maxlen=self.maxlen,
-                                          cps_gs=[deque(maxlen=self.maxlen + 1), deque(maxlen=self.maxlen + 1)],
-                                          bounds=self.regions_bounds[-1], interest=self.interest[-1]))
-        self.nb_dims = len(mins)
-        self.nb_split_attempts = 50 if "nb_split_attempts" not in params else params['nb_split_attempts']
-        self.ndims = len(mins)
-
-        self.sampling_in_leaves_only = False if "sampling_in_leaves_only" not in params else params["sampling_in_leaves_only"]
-
-        # additional tricks to original RIAC, enforcing splitting rules
-
-        # 1 - minimum population required for both children when splitting
-        self.minlen = self.maxlen / 20 if "min_reg_size" not in params else params['min_reg_size']
-
-        # 2 - minimum children region size (compared to initial range of each dimension)
-        self.dims_ranges = maxs - mins
-        self.min_dims_range_ratio = 1/15 if "min_dims_range_ratio" not in params else params["min_dims_range_ratio"]
-
-        # if after nb_split_attempts, no split is valid, flush oldest points of parent region
-        self.discard_ratio = 1/4 if "discard_ratio" not in params else params["discard_ratio"]
+        self.tree.create_node('root','root',data=Region(maxlen=self.maxlen,
+                                                        cps_gs=[deque(maxlen=self.maxlen + 1), deque(maxlen=self.maxlen + 1)],
+                                                        bounds=self.regions_bounds[-1], interest=self.interest[-1]))
+        self.nb_dims = len(min)
+        self.temperature = temperature
+        self.nb_split_attempts = 50
+        self.max_difference = 0.2
+        self.init_size = max - min
+        self.ndims = len(min)
+        self.mode_3_noise = 0.1
 
         # book-keeping
         self.sampled_goals = []
         self.all_boxes = []
         self.all_interests = []
-        self.update_nb = -1
+        self.update_nb = 0
         self.split_iterations = []
 
-        if seed is None:
-            seed = np.random.randint(42,424242)
-        np.random.seed(seed)
-        self.hyperparams = locals()
-
     def compute_interest(self, sub_region):
-        if len(sub_region[0]) > 2:
+        if len(sub_region[0]) > self.minlen:  # TRICK NB 4
             cp_window = min(len(sub_region[0]), self.window_cp)  # not completely window
             half = int(cp_window / 2)
             # print(str(cp_window) + 'and' + str(half))
@@ -87,6 +78,7 @@ class RIAC():
         # try nb_split_attempts splits
         reg = self.tree.get_node(nid).data
         best_split_score = 0
+        best_abs_interest_diff = 0
         best_bounds = None
         best_sub_regions = None
         is_split = False
@@ -94,7 +86,7 @@ class RIAC():
             sub_reg1 = [deque(maxlen=self.maxlen + 1), deque(maxlen=self.maxlen + 1)]
             sub_reg2 = [deque(maxlen=self.maxlen + 1), deque(maxlen=self.maxlen + 1)]
 
-            # repeat until the two sub regions contain at least minlen of the mother region
+            # repeat until the two sub regions contain at least minlen of the mother region TRICK NB 1
             while len(sub_reg1[0]) < self.minlen or len(sub_reg2[0]) < self.minlen:
                 # decide on dimension
                 dim = np.random.choice(range(self.nb_dims))
@@ -105,10 +97,9 @@ class RIAC():
                 bounds2.low[dim] = threshold
                 bounds = [bounds1, bounds2]
                 valid_bounds = True
-
-                if np.any(bounds1.high - bounds1.low < self.dims_ranges * self.min_dims_range_ratio):
+                if np.any(bounds1.high - bounds1.low < self.init_size / 15):  # to enforce not too small boxes TRICK NB 2
                     valid_bounds = False
-                if np.any(bounds2.high - bounds2.low < self.dims_ranges * self.min_dims_range_ratio):
+                if np.any(bounds2.high - bounds2.low < self.init_size / 15):
                     valid_bounds = valid_bounds and False
 
                 # perform split in sub regions
@@ -128,31 +119,76 @@ class RIAC():
 
             # compute score
             split_score = len(sub_reg1) * len(sub_reg2) * np.abs(interest[0] - interest[1])
-            if split_score >= best_split_score and valid_bounds:
+            if split_score >= best_split_score and valid_bounds: # TRICK NB 3, max diff #and np.abs(interest[0] - interest[1]) >= self.max_difference / 8
                 is_split = True
+                best_abs_interest_diff = np.abs(interest[0] - interest[1])
                 best_split_score = split_score
                 best_sub_regions = sub_regions
                 best_bounds = bounds
 
         if is_split:
+            if best_abs_interest_diff > self.max_difference:
+                self.max_difference = best_abs_interest_diff
             # add new nodes to tree
             for i, (cps_gs, bounds) in enumerate(zip(best_sub_regions, best_bounds)):
-                self.tree.create_node(identifier=self.tree.size(), parent=nid,
-                                      data=Region(self.maxlen, cps_gs=cps_gs, bounds=bounds, interest=interest[i]))
+                self.tree.create_node(parent=nid, data=Region(self.maxlen, cps_gs=cps_gs, bounds=bounds, interest=interest[i]))
         else:
+            #print("abort mission")
+            # TRICK NB 6, remove old stuff if can't find split
             assert len(reg.cps_gs[0]) == (self.maxlen + 1)
-            reg.cps_gs[0] = deque(islice(reg.cps_gs[0], int(self.maxlen * self.discard_ratio), self.maxlen + 1))
-            reg.cps_gs[1] = deque(islice(reg.cps_gs[1], int(self.maxlen * self.discard_ratio), self.maxlen + 1))
+            reg.cps_gs[0] = deque(islice(reg.cps_gs[0], int(self.maxlen / 4), self.maxlen + 1))
+            reg.cps_gs[1] = deque(islice(reg.cps_gs[1], int(self.maxlen / 4), self.maxlen + 1))
 
         return is_split
+
+    def merge(self, all_nodes):
+        # get a list of children pairs
+        parent_children = []
+        for n in all_nodes:
+            if not n.is_leaf():  # if node is a parent
+                children = self.tree.children(n.identifier)
+                if children[0].is_leaf() and children[1].is_leaf():  # both children must be leaves for an easy remove
+                    parent_children.append([n, children])  # [parent, [child1, child2]]
+
+        # sort each pair of children by their summed interest
+        parent_children.sort(key=lambda x: np.abs(x[1][0].data.interest - x[1][1].data.interest), reverse=False)
+
+        # remove useless pair
+        child1 = parent_children[0][1][0]
+        child2 = parent_children[0][1][1]
+        # print("just removed {} and {}, daddy is: {}, childs: {}".format(child1.identifier, child2.identifier,
+        #                                                                 parent_children[0][0].identifier,
+        #                                                                 self.tree.children(
+        #
+        # print("bef")  #                                                               parent_children[0][0].identifier)))
+        # print([n.identifier for n in self.tree.all_nodes()])
+        self.tree.remove_node(child1.identifier)
+        self.tree.remove_node(child2.identifier)
+        # print("aff remove {} and {}".format(child1.identifier), child2.identifier)
+        # print([n.identifier for n in self.tree.all_nodes()])
+
+        # remove 1/4 of parent to avoid falling in a splitting-merging loop
+        dadta = parent_children[0][0].data  # hahaha!
+        dadta.cps_gs[0] = deque(islice(dadta.cps_gs[0], int(self.maxlen / 4), self.maxlen + 1))
+        dadta.cps_gs[1] = deque(islice(dadta.cps_gs[1], int(self.maxlen / 4), self.maxlen + 1))
+        self.nodes_to_recompute.append(parent_children[0][0].identifier)
+
+        # remove child from recompute list if they where touched when adding the current goal
+        if child1.identifier in self.nodes_to_recompute:
+            self.nodes_to_recompute.pop(self.nodes_to_recompute.index(child1.identifier))
+        if child2.identifier in self.nodes_to_recompute:
+            self.nodes_to_recompute.pop(self.nodes_to_recompute.index(child2.identifier))
+
+
+
 
     def add_goal_comp(self, node, goal, comp):
         reg = node.data
         nid = node.identifier
-        if reg.bounds.contains(goal):  # goal falls within region
+        if reg.bounds.contains(goal): # goal falls within region
             self.nodes_to_recompute.append(nid)
             children = self.tree.children(nid)
-            for n in children:  # if goal in region, goal is in one sub-region
+            for n in children: # if goal in region, goal is in one sub-region
                 self.add_goal_comp(n, goal, comp)
 
             need_split = reg.add(goal, comp, children == []) # COPY ALL MODE
@@ -161,7 +197,6 @@ class RIAC():
 
 
     def update(self, goal, continuous_competence, all_raw_rewards):
-        self.update_nb += 1
         # add new (goal, competence) to regions nodes
         self.nodes_to_split = []
         self.nodes_to_recompute = []
@@ -176,21 +211,25 @@ class RIAC():
         if need_split:
             new_split = self.split(self.nodes_to_split[0])
             if new_split:
+                self.update_nb += 1
                 #print(self.update_nb)
                 # update list of regions_bounds
-                if self.sampling_in_leaves_only:
-                    self.regions_bounds = [n.data.bounds for n in self.tree.leaves()]
-                else:
-                    self.regions_bounds = [n.data.bounds for n in self.tree.all_nodes()]
+                all_nodes = self.tree.all_nodes()
+                if len(all_nodes) > self.maxregions:  # too many regions, lets merge one of them
+                    self.merge(all_nodes)
+                    all_nodes = self.tree.all_nodes()
+                self.regions_bounds = [n.data.bounds for n in all_nodes]
 
         # recompute interests of touched nodes
+        #print(self.nodes_to_recompute)
         for nid in self.nodes_to_recompute:
+            #print(nid)
             node = self.tree.get_node(nid)
             reg = node.data
             reg.interest = self.compute_interest(reg.cps_gs)
 
         # collect new interests and new [comp, goals] lists
-        all_nodes = self.tree.all_nodes() if not self.sampling_in_leaves_only else self.tree.leaves()
+        all_nodes = self.tree.all_nodes()
         self.interest = []
         self.cps_gs = []
         for n in all_nodes:
@@ -198,10 +237,9 @@ class RIAC():
             self.cps_gs.append(n.data.cps_gs)
 
         # bk-keeping
-        if new_split:
-            self.all_boxes.append(copy.copy(self.regions_bounds))
-            self.all_interests.append(copy.copy(self.interest))
-            self.split_iterations.append(self.update_nb)
+        self.all_boxes.append(copy.copy(self.regions_bounds))
+        self.all_interests.append(copy.copy(self.interest))
+        self.split_iterations.append(self.update_nb)
         assert len(self.interest) == len(self.regions_bounds)
 
         return new_split, None
@@ -230,13 +268,28 @@ class RIAC():
             region_id = proportional_choice(self.interest, eps=0.0)
             self.sampled_goals.append(self.regions_bounds[region_id].sample())
 
+
+        # # sample region
+        # if np.random.rand() < 0.2:
+        #     region_id = np.random.choice(range(self.nb_regions))
+        # else:
+        #     region_id = np.random.choice(range(self.nb_regions), p=np.array(self.probas))
+
+        # # sample goal
+        # self.sampled_goals.append(self.regions_bounds[region_id].sample())
+        #
+        # return self.sampled_goals[-1].tolist()
+        # sample region
+        # region_id = proportional_choice(self.interest, eps=0.2)
+        # # sample goal
+        # self.sampled_goals.append(self.regions_bounds[region_id].sample())
+
         return self.sampled_goals[-1]
 
     def dump(self, dump_dict):
         dump_dict['all_boxes'] = self.all_boxes
         dump_dict['split_iterations'] = self.split_iterations
         dump_dict['all_interests'] = self.all_interests
-        dump_dict['riac_params'] = self.hyperparams
         return dump_dict
 
     @property

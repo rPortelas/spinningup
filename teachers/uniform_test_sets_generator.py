@@ -1,6 +1,6 @@
 import numpy as np
 import pickle
-from param_env_utils.test_utils import get_test_set_name
+from teachers.utils.test_utils import get_test_set_name
 import copy
 
 np.random.seed(4222)

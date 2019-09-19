@@ -6,7 +6,7 @@ import time
 from teachers.sagg_iac import SAGG_IAC
 from teachers.algos.riac import RIAC
 from teachers.algos.florensa_riac import Florensa_RIAC
-from teachers.algos.gmm import InterestGMM
+from teachers.algos.alp_gmm import InterestGMM
 from teachers.algos.covar_gmm import CovarGMM
 #from teachers.algos.cma_es import InterestCMAES
 import pickle

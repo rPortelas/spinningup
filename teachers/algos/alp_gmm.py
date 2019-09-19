@@ -8,9 +8,18 @@ from sklearn.datasets import make_moons
 import numpy as np
 import copy
 from gym.spaces import Box
-from param_env_utils.imgep_utils.dataset import BufferedDataset
-from param_env_utils.imgep_utils.gep_utils import proportional_choice
-from param_env_utils.imgep_utils.dwgmm import DimensionallyWeightedGMM
+from teachers.utils.dataset import BufferedDataset
+from teachers.algos.dwgmm import DimensionallyWeightedGMM
+
+
+
+def proportional_choice(v, eps=0.):
+    if np.sum(v) == 0 or np.random.rand() < eps:
+        return np.random.randint(np.size(v))
+    else:
+        probas = np.array(v) / np.sum(v)
+        return np.where(np.random.multinomial(1, probas) == 1)[0][0]
+
 
 class EmpiricalLearningProgress():
     def __init__(self, goal_size):
@@ -132,8 +141,9 @@ class InterestGMM():
                 else:
                     raise NotImplementedError
                     exit(1)
-                #plt.plot(self.potential_ks, bics, label='BIC')
-                #plt.show()
+                # plt.plot(self.potential_ks, fitnesses, label='AIC')
+                # plt.show(block=False)
+                # plt.pause(0.5)
                 self.gmm = self.potential_gmms[np.argmin(fitnesses)]
 
                 # book-keeping
