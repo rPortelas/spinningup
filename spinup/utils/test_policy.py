@@ -159,10 +159,10 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
                   'step_height':None,
                   'step_number':None}
 
-    #test_env_list = pickle.load(open("/home/remy/projects/spinningup/param_env_utils/test_sets/poly_shape0_4.0.pkl", "rb"))
-    test_env_list = pickle.load(open("/home/remy/projects/spinningup/param_env_utils/test_sets/stump_height0_3.0obstacle_spacing0_6.0.pkl", "rb"))
+    #test_env_list = pickle.load(open("/home/remy/projects/spinningup/teachers/test_sets/poly_shape0_4.0.pkl", "rb"))
+    test_env_list = pickle.load(open("/home/remy/projects/spinningup/teachers/test_sets/stump_height0_3.0obstacle_spacing0_6.0.pkl", "rb"))
     test_env_list = pickle.load(
-        open("/home/remy/projects/spinningup/param_env_utils/test_sets/stump_seq0_6.0.pkl",
+        open("/home/remy/projects/spinningup/teachers/test_sets/stump_seq0_6.0.pkl",
              "rb"))
     #test_env_list = params_2_env_list([[0.4,0.8]],['stump_height','obstacle_spacing']) #short agent seed 7(or 11)
     #test_env_list = params_2_env_list([[0,0],[0.7,1.0],[1.6,5.5],[1.9,0.01]],['stump_height', 'obstacle_spacing']) # default agent seed 0

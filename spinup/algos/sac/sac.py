@@ -4,7 +4,7 @@ import gym
 import gym_flowers
 import time
 from spinup.algos.sac import core
-from param_env_utils.env_params_selection import EnvParamsSelector
+from teachers.teacher_controller import EnvParamsSelector
 from spinup.algos.sac.core import get_vars
 from spinup.utils.logx import EpochLogger
 from spinup.utils.normalization_utils import MaxMinFilter
