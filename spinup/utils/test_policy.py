@@ -22,7 +22,8 @@ empty_arg_ranges = {'roughness':None,
               'poly_shape':None,
               'gap_width':None,
               'step_height':None,
-              'step_number':None}
+              'step_number':None,
+              'stump_seq':None}
 
 
 def params_2_env_list(param_list,key):
@@ -30,6 +31,7 @@ def params_2_env_list(param_list,key):
     for p in param_list:
         env_arg = copy.copy(empty_arg_ranges)
         if len(key) == 1:
+            print(p)
             env_arg[key] = p
         else:
             for i, k in enumerate(key):
@@ -103,6 +105,7 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
         random_stump_r = None
         random_stump_w = None
         random_ob_spacing = None
+        random_stump_seq = None
         if kwargs['stump_height'] is not None:
             random_stump_h = [kwargs['stump_height'], 0.1]
         if 'stump_rot' in kwargs.keys() and kwargs['stump_rot'] is not None:
@@ -113,11 +116,13 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
             random_tunnel_h = [kwargs['tunnel_height'], 0.1]
         if kwargs['obstacle_spacing'] is not None:
             random_ob_spacing = kwargs['obstacle_spacing']
+        if kwargs['stump_seq'] is not None:
+            random_stump_seq = kwargs['stump_seq']
         env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_h,
                                 stump_width=random_stump_w, stump_rot=random_stump_r,
                                 tunnel_height=None, obstacle_spacing=random_ob_spacing,
                                 gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
-                                step_number=kwargs['step_number'], poly_shape=kwargs['poly_shape'])
+                                step_number=kwargs['step_number'], poly_shape=kwargs['poly_shape'], stump_seq=random_stump_seq)
 
     def poly_2_width_height(params):
             scaling = 14 / 30.0
@@ -156,9 +161,14 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
 
     #test_env_list = pickle.load(open("/home/remy/projects/spinningup/param_env_utils/test_sets/poly_shape0_4.0.pkl", "rb"))
     test_env_list = pickle.load(open("/home/remy/projects/spinningup/param_env_utils/test_sets/stump_height0_3.0obstacle_spacing0_6.0.pkl", "rb"))
-    test_env_list = params_2_env_list([[0.4,0.8]],['stump_height','obstacle_spacing']) #short agent seed 7(or 11)
+    test_env_list = pickle.load(
+        open("/home/remy/projects/spinningup/param_env_utils/test_sets/stump_seq0_6.0.pkl",
+             "rb"))
+    #test_env_list = params_2_env_list([[0.4,0.8]],['stump_height','obstacle_spacing']) #short agent seed 7(or 11)
     #test_env_list = params_2_env_list([[0,0],[0.7,1.0],[1.6,5.5],[1.9,0.01]],['stump_height', 'obstacle_spacing']) # default agent seed 0
     #test_env_list = params_2_env_list([[0,0],[3.0,0.0],[3.0,5], [1.5,0.5]],['stump_height', 'obstacle_spacing']) # long agent seed 0
+
+    #test_env_list = params_2_env_list([[5.0,1.0,5.0,1.0,5.0,1.0,5.0,1.0,5.0,1.0]],'stump_seq') # long agent seed 0
 
     # final_list = []
     # for i in [19]:
@@ -179,8 +189,7 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
     # init_poly = np.zeros(12)
     # init_poly += 5
     for i,args in enumerate(test_env_list):
-        # if i not in [48,36]:#[3,10, 8, 19, 26]:#,26]:
-        #     continue
+
         #args = params_2_env_list([init_poly],'poly_shape')[0]
         # if i not in [0,1,3,6,4]:
         #     continue
@@ -239,8 +248,9 @@ def run_policy(env, get_action, max_ep_len=None, num_episodes=100, render=True, 
         # print(np.array(images[0]).shape)
     #[150:315,:-320,:] for long
     #[200:315,:-320,:] for default
+        imageio.mimsave('graphics/demo_quadru_seq_env_{}.gif'.format(i), [np.array(img)[110:315,:-320,:] for i, img in enumerate(images)], fps=29)
         #imageio.mimsave('graphics/stump_gmm_demo_compact_{}.gif'.format(i), [np.array(img)[150:315,:-320,:] for i, img in enumerate(images)], fps=29)
-        imageio.mimsave('graphics/demo_short_stump_gmm_asquad_{}.gif'.format(i), [np.array(img)[150:315,:-320,:] for i, img in enumerate(images)], fps=29)
+        #imageio.mimsave('graphics/demo_short_stump_gmm_asquad_{}.gif'.format(i), [np.array(img)[150:315,:-320,:] for i, img in enumerate(images)], fps=29)
         #imageio.mimsave('graphics/demo_default_stump_gmm_asquad_{}.gif'.format(i), [np.array(img)[150:315,:-320,:] for i, img in enumerate(images)], fps=29)
         #imageio.mimsave('graphics/demo_quadru_stump_gmm_compact_{}.gif'.format(i), [np.array(img)[150:315,:-320,:] for i, img in enumerate(images)], fps=29)
 

@@ -79,7 +79,7 @@ class InterestGMM():
 
     def init_gmm(self, nb_gaussians):
         if self.use_weighted_gmm:
-            return DimensionallyWeightedGMM(n_components=nb_gaussians, covariance_type='full', random_state=self.seed,
+            return DimensionallyWeightedGMM(n_components=nb_gaussians, covariance_type='full',
                    warm_start=self.warm_start)
         else:
             return GMM(n_components=nb_gaussians, covariance_type='full', random_state=self.seed,
@@ -117,7 +117,7 @@ class InterestGMM():
                 #print(np.array(self.goals_lps))
                 cur_goals_lps = np.array(self.goals_lps[-self.window:])
                 self.potential_gmms = [g.fit(cur_goals_lps) for g in self.potential_gmms]#  fit all
-
+                fitnesses = []
                 if self.gmm_fitness_fun == 'bic':
                     fitnesses = [m.bic(cur_goals_lps) for m in self.potential_gmms]
                 elif self.gmm_fitness_fun == 'aic':

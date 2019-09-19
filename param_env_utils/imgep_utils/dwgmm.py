@@ -44,23 +44,6 @@ def _estimate_log_gaussian_prob(X, means, precisions_chol, covariance_type):
             #print(weighted_square_y[0:2, :])
             log_prob[:, k] = np.sum(weighted_square_y, axis=1)
 
-    elif covariance_type == 'tied':
-        log_prob = np.empty((n_samples, n_components))
-        for k, mu in enumerate(means):
-            y = np.dot(X, precisions_chol) - np.dot(mu, precisions_chol)
-            log_prob[:, k] = np.sum(np.square(y), axis=1)
-
-    elif covariance_type == 'diag':
-        precisions = precisions_chol ** 2
-        log_prob = (np.sum((means ** 2 * precisions), 1) -
-                    2. * np.dot(X, (means * precisions).T) +
-                    np.dot(X ** 2, precisions.T))
-
-    elif covariance_type == 'spherical':
-        precisions = precisions_chol ** 2
-        log_prob = (np.sum(means ** 2, 1) * precisions -
-                    2 * np.dot(X, means.T * precisions) +
-                    np.outer(row_norms(X, squared=True), precisions))
     return -.5 * (n_features * np.log(2 * np.pi) + log_prob) + log_det
 
 class DimensionallyWeightedGMM(GMM):

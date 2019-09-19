@@ -10,6 +10,7 @@ import os
 from matplotlib.patches import Ellipse
 import matplotlib.colors as colors
 
+
 def plt_2_rgb(ax):
     ax.figure.canvas.draw()
     data = np.frombuffer(ax.figure.canvas.tostring_rgb(), dtype=np.uint8)
@@ -112,7 +113,7 @@ def region_plot_gif(all_boxes, interests, iterations, goals, gifname='saggriac',
     imageio.mimsave(gifdir + gifname + '.gif', images, duration=0.4)
 
 
-def draw_ellipse(position, covariance, ax=None, **kwargs):
+def draw_ellipse(position, covariance, ax=None, color=None, **kwargs):
     """Draw an ellipse with a given position and covariance"""
     ax = ax or plt.gca()
 
@@ -131,31 +132,34 @@ def draw_ellipse(position, covariance, ax=None, **kwargs):
     # Draw the Ellipse
     for nsig in range(2, 3):
         ax.add_patch(Ellipse(position, nsig * width, nsig * height,
-                             angle, **kwargs))
+                             angle, **kwargs, color=color))
 
-def draw_competence_grid(ax, comp_grid, x_bnds, y_bnds):
+def draw_competence_grid(ax, comp_grid, x_bnds, y_bnds, bar=True):
+    comp_grid[comp_grid == 100] = 1000
     ax.pcolor(x_bnds, y_bnds, np.transpose(comp_grid),cmap=plt.cm.gray, edgecolors='k', linewidths=2,
               alpha=0.3)
-    cax, _ = cbar.make_axes(ax,location='left')
-    cb = cbar.ColorbarBase(cax, cmap=plt.cm.gray)
-    cb.set_label('Competence')
-    cax.yaxis.set_ticks_position('left')
-    cax.yaxis.set_label_position('left')
+    if bar:
+        cax, _ = cbar.make_axes(ax,location='left')
+        cb = cbar.ColorbarBase(cax, cmap=plt.cm.gray)
+        cb.set_label('Competence')
+        cax.yaxis.set_ticks_position('left')
+        cax.yaxis.set_label_position('left')
 
-def plot_gmm(weights, means, covariances, X, ax=None, xlim=[0,1], ylim=[0,1],
-             xlabel='jkl', ylabel='jhgj', bar=True, bar_side='right',no_y=False):
+def plot_gmm(weights, means, covariances, X=None, ax=None, xlim=[0,1], ylim=[0,1],
+             xlabel='jkl', ylabel='jhgj', bar=True, bar_side='right',no_y=False, color=None):
     ft_off = 15
 
     ax = ax or plt.gca()
     cmap = truncate_colormap(plt.cm.autumn_r, minval=0.2,maxval=1.0)
     #colors = [plt.cm.jet(i) for i in X[:, -1]]
-    colors = [cmap(i) for i in X[:, -1]]
-    sizes = [5+np.interp(i,[0,1],[0,10]) for i in X[:, -1]]
-    ax.scatter(X[:, 0], X[:, 1], c=colors, s=sizes, zorder=2)
-    #ax.axis('equal')
+    if X is not None:
+        colors = [cmap(i) for i in X[:, -1]]
+        sizes = [5+np.interp(i,[0,1],[0,10]) for i in X[:, -1]]
+        ax.scatter(X[:, 0], X[:, 1], c=colors, s=sizes, zorder=2)
+        #ax.axis('equal')
     w_factor = 0.6 / weights.max()
     for pos, covar, w in zip(means, covariances, weights):
-        draw_ellipse(pos, covar, alpha=0.6, ax=ax)
+        draw_ellipse(pos, covar, alpha=0.6, ax=ax, color=color)
 
     #plt.margins(0, 0)
     ax.set_xlim(left=xlim[0], right=xlim[1])
@@ -203,8 +207,9 @@ def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None,
     for i,(ws, covs, means, ep) in enumerate(zip(bk['weights'], bk['covariances'], bk['means'], bk['episodes'])):
             plt.figure(figsize=fig_size)
             ax = plt.gca()
-            plot_gmm(ws, means, covs, np.array(gs_lps[old_ep+gen_size:ep+gen_size]),
-                     ax=ax, xlim=xlim, ylim=ylim, bar=bar)  #add gen_size to have gmm + the points that they generated, not they fitted
+            plot_gmm(ws, means, covs, np.array(gs_lps[old_ep + gen_size:ep + gen_size]),
+                     ax=ax, xlim=xlim, ylim=ylim,
+                     bar=bar)  # add gen_size to have gmm + the points that they generated, not they fitted
             if 'comp_grid' in bk:  # add competence grid info
                 draw_competence_grid(ax,bk['comp_grids'][i], bk['comp_xs'][i], bk['comp_ys'][i])
             if 'start_points' in bk:  # add lineworld info
@@ -219,6 +224,101 @@ def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None,
 
     imageio.mimsave(gifdir + gifname + '.gif', images, duration=0.4)
 
+
+def hgmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None,
+                 xlim=[0,1], ylim=[0,1], fig_size=(9,6), save_imgs=True, title=True, bar=False):
+    cluster_color = ['g','b','orange','black','red','cyan','pink']
+    plt.ioff()
+    # Create target Directory if don't exist
+    tmpdir = 'tmp/'
+    tmppath = gifdir + 'tmp/'
+    if not os.path.exists(tmppath):
+        os.mkdir(tmppath)
+        print("Directory ", tmppath, " Created ")
+    else:
+        print("Directory ", tmppath, " already exists")
+    print("Making " + tmppath + gifname + ".gif")
+    images = []
+    old_ep = 0
+    gen_size = int(len(bk['tasks']) / len(bk['episodes']))
+    tasks = bk['tasks']
+
+    for i,(clusters_ws, clusters_covs, clusters_means, clusters_alp, clusters_tasks, ep) \
+            in enumerate(zip(bk['clusters_weights'], bk['clusters_covariances'], bk['clusters_means'], bk['clusters_lps'], bk['clusters_tasks'], bk['episodes'])):
+        print(ep)
+        plt.figure(figsize=fig_size)
+        ax = plt.gca()
+        for j,(ws, covs, means, c_tasks, alp) in enumerate(zip(clusters_ws, clusters_covs, clusters_means, clusters_tasks, clusters_alp)):
+                if ws[0] == "single_gaussian":
+                    draw_ellipse(means[0], covs[0], alpha=0.6, ax=ax, color=cluster_color[j])
+                    ax.plot(-5, -5, color=cluster_color[j], markersize=1, label="ALP({}):{} [1-G]".format(len(c_tasks), round(alp, 2)))
+                else:
+                    print(ws)
+                    plot_gmm(ws, means, covs, ax=ax, xlim=xlim, ylim=ylim, bar=bar, color=cluster_color[j])  #add gen_size to have gmm + the points that they generated, not they fitted
+                    ax.plot(-5, -5, color=cluster_color[j], markersize=1, label="ALP({}):{}".format(len(c_tasks), round(alp,2)))
+        X = np.array(tasks[ep:ep + gen_size])
+        plt.legend(loc='upper left', bbox_to_anchor=(-0.5, 1.0))
+
+        #print(X.shape)
+        ax.scatter(X[:, 0], X[:, 1], c='b', s=2, zorder=2)
+        if 'comp_grids' in bk:  # add competence grid info
+            draw_competence_grid(ax,bk['comp_grids'][i], bk['comp_xs'][i], bk['comp_ys'][i], bar=False)
+        if 'start_points' in bk:  # add lineworld info
+            draw_lineworld_info(ax, bk['start_points'], bk['end_points'], bk['current_states'][i])
+        f_name = gifdir+tmpdir+gifname+"_{}.png".format(ep)
+        if title:
+            plt.suptitle('Episode {} | nb Clusters:{}'.format(ep,len(clusters_means[0])), fontsize=20)
+        old_ep = ep
+        if save_imgs: plt.savefig(f_name, bbox_inches='tight')
+        images.append(plt_2_rgb(ax))
+        plt.close()
+
+    imageio.mimsave(gifdir + gifname + '.gif', images, duration=0.4)
+
+
+def egep_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None,
+                 xlim=[0,1], ylim=[0,1], fig_size=(9,6), save_imgs=False, title=True, bar=True):
+    plt.ioff()
+    # Create target Directory if don't exist
+    tmpdir = 'tmp/'
+    tmppath = gifdir + 'tmp/'
+    if not os.path.exists(tmppath):
+        os.mkdir(tmppath)
+        print("Directory ", tmppath, " Created ")
+    else:
+        print("Directory ", tmppath, " already exists")
+    print("Making " + tmppath + gifname + ".gif")
+    images = []
+    for i, e_idxs in enumerate(bk['elites_idx']):
+            if i == 0:
+                continue
+            plt.figure(figsize=fig_size)
+            ax = plt.gca()
+            if 'comp_grids' in bk:  # add competence grid info
+                draw_competence_grid(ax,bk['comp_grids'][i], bk['comp_xs'][i], bk['comp_ys'][i])
+            if 'start_points' in bk:  # add lineworld info
+                draw_lineworld_info(ax, bk['start_points'], bk['end_points'], bk['current_states'][i])
+
+            last_tasks = np.array(bk['tasks'][i*1000:(i*1000)+200])
+            currX = []
+            currlps = []
+            for idx in e_idxs:
+                currX.append(bk['tasks'][idx])
+                currlps.append(bk['lps'][idx])
+            currX = np.array(currX)
+            currColors = [plt.cm.jet(i) for i in currlps]
+            ax.scatter(last_tasks[:, 0], last_tasks[:, 1], s=5, zorder=2)
+            ax.scatter(currX[:, 0], currX[:, 1], c=currColors, s=10, zorder=2)
+            ax.set_xlim(left=xlim[0], right=xlim[1])
+            ax.set_ylim(bottom=ylim[0], top=ylim[1])
+            #f_name = gifdir+tmpdir+gifname+"_{}.png".format(ep)
+            if title:
+                plt.suptitle('Episode {}'.format(i*1000), fontsize=20)
+            if save_imgs: plt.savefig(f_name, bbox_inches='tight')
+            images.append(plt_2_rgb(ax))
+            plt.close()
+
+    imageio.mimsave(gifdir + gifname + '.gif', images, duration=0.4)
 
 def plot_cmaes(mean, covariance, ints, X, sigma, currX=None, currInts=None,
                ax=None, xlim=[0.,1.], ylim=[0,1], xlabel='jkl', ylabel='jhgj'):

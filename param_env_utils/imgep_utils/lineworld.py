@@ -18,6 +18,7 @@ import math
 from param_env_utils.imgep_utils.plot_utils import region_plot_gif, plot_gmm, gmm_plot_gif
 from param_env_utils.imgep_utils.riac import RIAC
 from param_env_utils.imgep_utils.covar_gmm import CovarGMM
+from param_env_utils.imgep_utils.egep import EGEP
 
 def rotate(origin, point, angle):
     """
@@ -292,6 +293,22 @@ def test_interest_gmm(env, nb_episodes, gif=False, nb_dims=2, score_step=1000, v
         gmm_plot_gif(bk, gifname='lineworld_gmm'+str(time.time()), gifdir='gifs/')
     return scores
 
+def test_egep(env, nb_episodes, gif=False, nb_dims=2, score_step=1000, verbose=True, params={}):
+    goal_generator = EGEP([0]*nb_dims, [1]*nb_dims, params=params)
+    rewards = []
+    scores = []
+    for i in range(nb_episodes+1):
+        if (i % score_step) == 0:
+            scores.append(env.get_score())
+            if verbose:
+                print(scores[-1])
+
+        goal = goal_generator.sample_goal()
+        comp = env.episode(goal)
+        goal_generator.update(np.array(goal), comp)
+        rewards.append(comp)
+    return scores
+
 def test_covar_gmm(env, nb_episodes, gif=False, nb_dims=2, score_step=1000, verbose=True, params={}):
     goal_generator = CovarGMM([0]*nb_dims, [1]*nb_dims, params=params)
     rewards = []
@@ -434,23 +451,24 @@ if batch_exp:
         exp_nbs = [int(sys.argv[1])]
         print("launching expe" + sys.argv[1] + " : " + exp_args[exp_nbs[0]]["id"])
 
-    for i in exp_nbs:
-         run_stats(**exp_args[i])
+    # for i in exp_nbs:
+    #      run_stats(**exp_args[i])
 
-    # #Display all stats
-    # all_ids = []
-    # for i,exp in enumerate(exp_args):
-    #     all_ids.append(exp["id"])
-    #     load_stats(all_ids[-1], fnum=i)
-    # plt.show()
+    #Display all stats
+    all_ids = []
+    for i,exp in enumerate(exp_args):
+        all_ids.append(exp["id"])
+        load_stats(all_ids[-1], fnum=i)
+    plt.show()
 else:
     start = time.time()
     np.random.seed(43)
     nb_steps = 100
-    nb_dims = 50
+    nb_dims = 5
     nb_funs = 5
-    eps = 1.91#0.75 #1.95
+    eps = 0.1#0.75 #1.95
     env = LineWorld(nb_steps=nb_steps, render=False, nb_dims=nb_dims, eps=eps, nb_funs=nb_funs)
-    # test_riac(env, 100000, nb_dims=nb_dims)
-    test_covar_gmm(env, 100000, nb_dims=nb_dims, gif=False, params={"gmm_fitness_fun":'aic',"potential_ks":np.arange(2,11,1)})
+    #test_egep(env, 100000, nb_dims=nb_dims)
+    test_riac(env, 100000, nb_dims=nb_dims)
+    #test_covar_gmm(env, 100000, nb_dims=nb_dims, gif=False, params={"gmm_fitness_fun":'aic',"potential_ks":np.arange(2,11,1)})
     #test_random(env, 100000, nb_dims=nb_dims)
