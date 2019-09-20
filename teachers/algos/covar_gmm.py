@@ -18,9 +18,9 @@ class CovarGMM():
         if not seed:
             self.seed = np.random.randint(42,424242)
         np.random.seed(self.seed)
-        self.mins = mins
-        self.maxs = maxs
-        self.random_goal_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
+        self.mins = np.array(mins)
+        self.maxs = np.array(maxs)
+        self.random_goal_generator = Box(self.mins, self.maxs, dtype=np.float32)
         self.goals = []
         self.goals_times_comps = []
         self.fit_rate = 250
@@ -35,7 +35,7 @@ class CovarGMM():
         self.bk = {'weights': [], 'covariances': [], 'means': [], 'goals_lps': [], 'episodes': [],
               'comp_grids': [], 'comp_xs': [], 'comp_ys': []}
 
-    def update(self, goal, competence,all_rewards=None):
+    def update(self, goal, competence):
         current_time = self.all_times[len(self.goals) % self.fit_rate]
         self.goals.append(goal)
         self.goals_times_comps.append(np.array(goal.tolist() + [current_time] + [competence]))
@@ -57,7 +57,7 @@ class CovarGMM():
                 self.bk['goals_lps'] = self.goals_times_comps
                 self.bk['episodes'].append(len(self.goals))
 
-    def sample_goal(self, kwargs=None, n_samples=1):
+    def sample_goal(self, n_samples=1):
         #print(len(self.goals))
         new_goals = []
         if (len(self.goals) < self.nb_random) or (np.random.random() < self.random_goal_ratio):  # random goals until enough data is collected
@@ -77,9 +77,10 @@ class CovarGMM():
                 new_goals.append(np.clip(new_goal, self.mins, self.maxs))
 
         if n_samples == 1:
-            return new_goals[0].tolist()
+            print(type(new_goals[0][0]))
+            return new_goals[0]
         else:
-            return np.array(new_goals)
+            return np.array(new_goals, dtype=np.float32)
 
     def dump(self, dump_dict):
         dump_dict.update(self.bk)

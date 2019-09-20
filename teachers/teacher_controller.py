@@ -4,10 +4,12 @@ import os
 import copy
 from teachers.algos.sagg_iac import SAGG_IAC
 from teachers.algos.riac import RIAC
-from teachers.algos.alp_gmm import InterestGMM
+from teachers.algos.alp_gmm import ALPGMM
 from teachers.algos.covar_gmm import CovarGMM
+from teachers.algos.random_teacher import RandomTeacher
+from teachers.algos.oracle_teacher import OracleTeacher
 from teachers.utils.test_utils import get_test_set_name
-
+from collections import OrderedDict
 
 def get_sorted2d_params(v_min, v_max, eps=1e-3):
     random_2dparams = np.random.uniform(v_min, v_max, 2)
@@ -20,202 +22,90 @@ def get_mu_sigma(v_min, v_max): #  assumes sigma has same bounds as mu
     random_2dparams = np.random.uniform(v_min, v_max, 2)
     return random_2dparams.tolist() #  returning mu and sigma
 
-class BaselineGoalGenerator(object):
-    def __init__(self, env_babbling, train_env_kwargs):
-        self.env_babbling = env_babbling
-        self.train_env_kwargs = train_env_kwargs
-        if env_babbling == 'oracle':
+def param_vec_to_param_dict(param_env_bounds, param):
+    param_dict = OrderedDict()
+    cpt = 0
+    for i,(name, bounds) in enumerate(param_env_bounds.items()):
+        if len(bounds) == 2:
+            param_dict[name] = param[i]
+            cpt += 1
+        elif len(bounds) == 3:  # third value is the number of dimensions having these bounds
+            nb_dims = bounds[2]
+            param_dict[name] = param[i:i+nb_dims]
+            cpt += nb_dims
+    #print('reconstructed param vector {}\n into {}'.format(param, param_dict)) #todo remove
+    return param_dict
 
-            self.min_stump_height = 0.0
-            self.max_stump_height = 0.5
+def param_dict_to_param_vec(param_env_bounds, param_dict):  # needs param_env_bounds for order reference
+    param_vec = []
+    for name, bounds in param_env_bounds.items():
+        #print(param_dict[name])
+        param_vec.append(param_dict[name])
+    return np.array(param_vec, dtype=np.float32)
 
-            self.min_poly_offset = 0.0
-            self.max_poly_offset = 0.66
 
-            self.min_ob_spacing = 5
-            self.max_ob_spacing = 6
-
-            self.min_seq = 0
-            self.max_seq = 1
-
-            self.mutation = 0.1
-
-            self.mutation_rate = 50 #mutate each 50 episodes
-            self.mutation_thr = 230 #reward threshold
-
-    def sample_goal(self, kwargs):
-        #print(kwargs)
-        params = copy.copy(self.train_env_kwargs)
-        random_stump_h = None
-        random_ob_spacing = None
-        random_stump_w = None
-        random_stump_r = None
-        random_poly_shape = None
-        random_stump_seq = None
-        if self.env_babbling == "random":
-            if kwargs['stump_height'] is not None:
-                random_stump_h = [np.random.uniform(kwargs['stump_height'][0], kwargs['stump_height'][1]), 0.1]
-            if kwargs['stump_width'] is not None:
-                random_stump_w = [np.random.uniform(kwargs['stump_width'][0], kwargs['stump_width'][1]), 0.1]
-            if kwargs['stump_rot'] is not None:
-                random_stump_r = [np.random.uniform(kwargs['stump_rot'][0], kwargs['stump_rot'][1]), 0.1]
-            if kwargs['obstacle_spacing'] is not None:
-                random_ob_spacing = get_mu_sigma(kwargs['obstacle_spacing'][0], kwargs['obstacle_spacing'][1])[0]
-            if kwargs['poly_shape'] is not None:
-                random_poly_shape = np.random.uniform(kwargs['poly_shape'][0],
-                                                      kwargs['poly_shape'][1], 12+kwargs['nb_rand_dim']).tolist()
-            if kwargs['stump_seq'] is not None:
-                random_stump_seq = np.random.uniform(kwargs['stump_seq'][0],
-                                                      kwargs['stump_seq'][1], 10).tolist()
-        elif self.env_babbling == "oracle":
-            if kwargs['stump_height'] is not None:
-                random_stump_h = [np.random.uniform(self.min_stump_height, self.max_stump_height), 0.1]
-            if kwargs['obstacle_spacing'] is not None:
-                random_ob_spacing = np.random.uniform(self.min_ob_spacing, self.max_ob_spacing)
-            if kwargs['poly_shape'] is not None:
-                random_poly_shape = np.random.uniform(self.min_poly_offset, self.max_poly_offset, 12).tolist()
-            if kwargs['stump_seq'] is not None:
-                random_stump_seq = np.random.uniform(self.min_seq, self.max_seq, 10).tolist()
-
-        params['stump_height'] = random_stump_h
-        params['stump_width'] = random_stump_w
-        params['stump_rot'] = random_stump_r
-        params['obstacle_spacing'] = random_ob_spacing
-        params['poly_shape'] = random_poly_shape
-        params['stump_seq'] = random_stump_seq
-        return params
-
-    def update(self, goal, reward, env_train_rewards):
-        if self.env_babbling == 'oracle':
-            if (len(env_train_rewards) % self.mutation_rate) == 0:
-                mean_ret = np.mean(env_train_rewards[-50:])
-                if mean_ret > self.mutation_thr:
-                    if self.train_env_kwargs['stump_height'] is not None:
-                        self.min_stump_height = min(self.min_stump_height + self.mutation, self.train_env_kwargs['stump_height'][1] - 0.5)
-                        self.max_stump_height = min(self.max_stump_height + self.mutation, self.train_env_kwargs['stump_height'][1])
-                        print('mut stump: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_stump_height,
-                                                                          self.max_stump_height))
-                    if self.train_env_kwargs['obstacle_spacing'] is not None:
-                        self.min_ob_spacing = max(0, self.min_ob_spacing - (self.mutation * 2))
-                        self.max_ob_spacing = max(1, self.max_ob_spacing - (self.mutation * 2))
-                        print('mut ob_spacing: mean_ret:{} aft:({},{})'.format(mean_ret, self.min_ob_spacing,
-                                                                           self.max_ob_spacing))
-                    if self.train_env_kwargs['poly_shape'] is not None:
-                        self.min_poly_offset = min(self.min_poly_offset + self.mutation, self.train_env_kwargs['poly_shape'][1] - 0.66)
-                        self.max_poly_offset = min(self.max_poly_offset + self.mutation, self.train_env_kwargs['poly_shape'][1])
-                    if self.train_env_kwargs['stump_seq'] is not None:
-                        self.min_seq = min(self.min_seq + self.mutation, self.train_env_kwargs['stump_seq'][1] - 1)
-                        self.max_seq = min(self.max_seq + self.mutation, self.train_env_kwargs['stump_seq'][1])
-
-    def dump(self, dump_dict):
-        return dump_dict
 
 class EnvParamsSelector(object):
-    def __init__(self, env_babbling, nb_test_episodes, train_env_kwargs, seed=None, teacher_params={}):
+    def __init__(self, env_babbling, nb_test_episodes, param_env_bounds, seed=None, teacher_params={}):
         self.env_babbling = env_babbling
         self.nb_test_episodes = nb_test_episodes
         self.test_ep_counter = 0
         self.eps= 1e-03
-        self.train_env_kwargs = copy.deepcopy(train_env_kwargs)
-        if train_env_kwargs['stump_height'] is not None:
-            self.min_stump_height = train_env_kwargs['stump_height'][0]
-            self.max_stump_height = train_env_kwargs['stump_height'][1]
-        if train_env_kwargs['stump_width'] is not None:
-            self.min_stump_width = train_env_kwargs['stump_width'][0]
-            self.max_stump_width = train_env_kwargs['stump_width'][1]
-        if train_env_kwargs['stump_rot'] is not None:
-            self.min_stump_rot = train_env_kwargs['stump_rot'][0]
-            self.max_stump_rot = train_env_kwargs['stump_rot'][1]
-        if train_env_kwargs['obstacle_spacing'] is not None:
-            self.min_ob_spacing = train_env_kwargs['obstacle_spacing'][0]
-            self.max_ob_spacing = train_env_kwargs['obstacle_spacing'][1]
+        self.param_env_bounds = copy.deepcopy(param_env_bounds)
 
-        # figure out parameters boundaries
-        mins, maxs = None, None
-        if (train_env_kwargs['stump_height'] is not None) \
-                and (train_env_kwargs['obstacle_spacing'] is not None)\
-                and (train_env_kwargs['stump_width'] is not None) \
-                and (train_env_kwargs['stump_rot'] is not None):
-            mins = np.array([self.min_stump_height, self.min_stump_width, self.min_stump_rot, self.min_ob_spacing])
-            maxs = np.array([self.max_stump_height, self.max_stump_width, self.max_stump_rot, self.max_ob_spacing])
-        elif (train_env_kwargs['stump_height'] is not None) and (train_env_kwargs['obstacle_spacing'] is not None):
-            mins = np.array([self.min_stump_height, self.min_ob_spacing])
-            maxs = np.array([self.max_stump_height, self.max_ob_spacing])
-        elif train_env_kwargs['stump_height'] is not None:
-            mins = np.array([self.min_stump_height] * 2)
-            maxs = np.array([self.max_stump_height] * 2)
-        elif train_env_kwargs['poly_shape'] is not None:
-            mins = np.array([train_env_kwargs['poly_shape'][0]] * 12)
-            maxs = np.array([train_env_kwargs['poly_shape'][1]] * 12)
-        elif train_env_kwargs['stump_seq'] is not None:
-            mins = np.array([train_env_kwargs['stump_seq'][0]] * 10)
-            maxs = np.array([train_env_kwargs['stump_seq'][1]] * 10)
-        else:
-            print('Unknown parameters')
-            raise NotImplementedError
+        # figure out parameters boundaries vectors
+        mins, maxs = [], []
+        for name, bounds in param_env_bounds.items():
+            if len(bounds) == 2:
+                mins.append(bounds[0])
+                maxs.append(bounds[1])
+            elif len(bounds) == 3:  # third value is the number of dimensions having these bounds
+                mins.extend([bounds[0]] * bounds[2])
+                maxs.extend([bounds[1]] * bounds[2])
+            else:
+                print("ill defined boundaries, use [min, max, nb_dims] format or [min, max] if nb_dims=1")
+                exit(1)
+        #print(mins)
+        #print(maxs) # todo remove
 
         # setup goals generator
-        if env_babbling == 'oracle' or env_babbling == 'random':
-            self.goal_generator = BaselineGoalGenerator(env_babbling, self.train_env_kwargs)
-        # elif env_babbling == 'sagg_iac':
-        #     self.goal_generator = SAGG_IAC(mins, maxs, seed=seed)
+        if env_babbling == 'oracle':
+            self.goal_generator = OracleTeacher(mins, maxs, teacher_params['window_step_vector'], seed=seed)
+        elif env_babbling == 'random':
+            self.goal_generator = RandomTeacher(mins, maxs, seed=seed)
         elif env_babbling == 'riac':
             self.goal_generator = RIAC(mins, maxs, seed=seed, params=teacher_params)
         elif env_babbling == 'gmm':
-            self.goal_generator = InterestGMM(mins, maxs, seed=seed, params=teacher_params)
+            self.goal_generator = ALPGMM(mins, maxs, seed=seed, params=teacher_params)
         elif env_babbling == 'bmm':
             self.goal_generator = CovarGMM(mins, maxs, seed=seed, params=teacher_params)
         else:
             print('Unknown env babbling')
             raise NotImplementedError
 
-        self.test_mode = "fixed_set" #"levels"
+        self.test_mode = "fixed_set"
         if self.test_mode == "fixed_set":
-            name = get_test_set_name(self.train_env_kwargs)
+            name = get_test_set_name(self.param_env_bounds)
             self.test_env_list = pickle.load( open("teachers/test_sets/"+name+".pkl", "rb" ) )
             print('fixed set of {} goals loaded: {}'.format(len(self.test_env_list),name))
 
-
-
         #data recording
-        self.env_params_train = {'stump_hs':[], 'stump_ws':[], 'stump_rs':[], 'ob_sps':[], 'poly_ss':[], 'seqs':[]}
+        self.env_params_train = []
         self.env_train_rewards = []
         self.env_train_norm_rewards = []
         self.env_train_len = []
 
-        self.env_params_test = {'stump_hs':[], 'stump_ws':[], 'stump_rs':[], 'ob_sps':[], 'poly_ss':[], 'seqs':[]}
+        self.env_params_test = []
         self.env_test_rewards = []
         self.env_test_len = []
-
-    def get_env_params_vec(self, all_env_params):
-        params = []
-        if all_env_params['stump_hs'][-1] is not None:
-            params += all_env_params['stump_hs'][-1]
-        if all_env_params['stump_ws'][-1] is not None:
-            params += all_env_params['stump_ws'][-1]
-        if (all_env_params['stump_hs'][-1] is not None) and (all_env_params['ob_sps'][-1] is not None):
-            params = [all_env_params['stump_hs'][-1][0], all_env_params['ob_sps'][-1]]
-        if (all_env_params['stump_hs'][-1] is not None) \
-            and (all_env_params['stump_ws'][-1] is not None) \
-            and (all_env_params['stump_rs'][-1] is not None) \
-            and (all_env_params['ob_sps'][-1] is not None):
-            params = [all_env_params['stump_hs'][-1][0], all_env_params['stump_ws'][-1][0],
-                      all_env_params['stump_rs'][-1][0], all_env_params['ob_sps'][-1]]
-        if all_env_params['poly_ss'][-1] is not None:
-            params = all_env_params['poly_ss'][-1]
-        if all_env_params['seqs'][-1] is not None:
-            params = all_env_params['seqs'][-1]
-        return np.array(params)
 
     def record_train_episode(self, reward, ep_len):
         self.env_train_rewards.append(reward)
         self.env_train_len.append(ep_len)
-        if (self.env_babbling == 'bmm') or (self.env_babbling == 'gmm') or (self.env_babbling == 'riac'):
+        if self.env_babbling != 'oracle':
             reward = np.interp(reward, (-150, 350), (0, 1))
             self.env_train_norm_rewards.append(reward)
-        self.goal_generator.update(self.get_env_params_vec(self.env_params_train),
-                                   reward, self.env_train_rewards)
-
+        self.goal_generator.update(self.env_params_train[-1], reward)
 
     def record_test_episode(self, reward, ep_len):
         self.env_test_rewards.append(reward)
@@ -228,93 +118,33 @@ class EnvParamsSelector(object):
                          'env_train_len': self.env_train_len,
                          'env_params_test': self.env_params_test,
                          'env_test_rewards': self.env_test_rewards,
-                         'env_test_len': self.env_test_len}
+                         'env_test_len': self.env_test_len,
+                         'env_param_bounds': list(self.param_env_bounds.items())}
             dump_dict = self.goal_generator.dump(dump_dict)
             pickle.dump(dump_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-    def set_env_params(self, env, kwargs):
-        params = self.goal_generator.sample_goal(kwargs)
-        if (self.env_babbling == 'gmm') \
-            or (self.env_babbling == 'riac')\
-            or (self.env_babbling == 'bmm'):
-            algo_params = copy.copy(params)
-            params = {'stump_height':None, 'stump_width':None,
-                      'stump_rot':None, 'obstacle_spacing':None, 'poly_shape':None, 'stump_seq':None}
-            if (kwargs['stump_height'] is not None) \
-                    and (kwargs['obstacle_spacing'] is not None) \
-                    and (kwargs['stump_width'] is not None) \
-                    and (kwargs['stump_rot'] is not None):
-                params['stump_height'] = [algo_params[0], 0.1]
-                params['stump_width'] = [algo_params[1], 0.1]
-                params['stump_rot'] = [algo_params[2], 0.1]
-                params['obstacle_spacing'] = algo_params[3]
-            elif (kwargs['stump_height'] is not None) and (kwargs['obstacle_spacing'] is not None):
-                params['stump_height'] = [algo_params[0], 0.1]
-                params['obstacle_spacing'] = algo_params[1]
-            elif kwargs['stump_height'] is not None:
-                params['stump_height'] = algo_params
-            elif kwargs['poly_shape'] is not None:
-                params['poly_shape'] = algo_params
-            elif kwargs['stump_seq'] is not None:
-                params['stump_seq'] = algo_params
-            else:
-                raise NotImplementedError
-        self.env_params_train['stump_hs'].append(params['stump_height'])
-        self.env_params_train['stump_ws'].append(params['stump_width'])
-        self.env_params_train['stump_rs'].append(params['stump_rot'])
-        self.env_params_train['ob_sps'].append(params['obstacle_spacing'])
-        self.env_params_train['poly_ss'].append(params['poly_shape'])
-        self.env_params_train['seqs'].append(params['stump_seq'])
-        env.env.set_environment(roughness=kwargs['roughness'], stump_height=params['stump_height'],
-                                stump_width=params['stump_width'], stump_rot=params['stump_rot'],
-                                obstacle_spacing=params['obstacle_spacing'], poly_shape=params['poly_shape'],
-                                stump_seq=params['stump_seq'],
-                                gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
-                                step_number=kwargs['step_number'], env_param_input=kwargs['env_param_input'])
+    def set_env_params(self, env):
+        params = copy.copy(self.goal_generator.sample_goal())
+        assert type(params[0]) == np.float32
+        self.env_params_train.append(params)
+        param_dict = param_vec_to_param_dict(self.param_env_bounds, params)
+        env.env.set_environment(**param_dict)
         return params
 
-    def set_test_env_params(self, test_env, kwargs):
+    def set_test_env_params(self, test_env):
         self.test_ep_counter += 1
-        #print("test_ep_nb:{}".format(self.test_ep_counter))
-
-        epsilon = 1e-03
-        random_stump_h = None
-        random_stump_r = None
-        random_stump_w = None
-        random_ob_spacing = None
-        random_poly_shape = None
-        random_stump_seq = None
-
         if self.test_mode == "fixed_set":
-            env_args = self.test_env_list[self.test_ep_counter-1]
-            if kwargs['stump_height'] is not None:
-                random_stump_h = [env_args['stump_height'], 0.1]
-            if kwargs['stump_width'] is not None:
-                random_stump_w = [env_args['stump_width'], 0.1]
-            if kwargs['stump_rot'] is not None:
-                random_stump_r = [env_args['stump_rot'], 0.1]
-            if kwargs['obstacle_spacing'] is not None:
-                random_ob_spacing = env_args['obstacle_spacing']
-            if 'poly_shape' in kwargs and kwargs['poly_shape'] is not None:
-                random_poly_shape = env_args['poly_shape']
-            if 'stump_seq' in kwargs and kwargs['stump_seq'] is not None:
-                random_stump_seq = env_args['stump_seq']
+            test_param_dict = self.test_env_list[self.test_ep_counter-1]
         else:
             raise NotImplementedError
 
+        #print('test param dict is: {}'.format(test_param_dict))
+        test_param_vec = param_dict_to_param_vec(self.param_env_bounds, test_param_dict)
+        #print('test param vector is: {}'.format(test_param_vec))
 
-        self.env_params_test['stump_hs'].append(random_stump_h)
-        self.env_params_test['stump_ws'].append(random_stump_w)
-        self.env_params_test['stump_rs'].append(random_stump_r)
-        self.env_params_test['ob_sps'].append(random_ob_spacing)
-        self.env_params_test['poly_ss'].append(random_poly_shape)
-        self.env_params_test['seqs'].append(random_stump_seq)
-        test_env.env.set_environment(roughness=kwargs['roughness'], stump_height=random_stump_h,
-                                     stump_width=random_stump_w, stump_rot=random_stump_r, poly_shape=random_poly_shape,
-                                     stump_seq=random_stump_seq, obstacle_spacing=random_ob_spacing,
-                                     gap_width=kwargs['gap_width'], step_height=kwargs['step_height'],
-                                     step_number=kwargs['step_number'], env_param_input=kwargs['env_param_input'])
+        self.env_params_test.append(test_param_vec)
+        test_env.env.set_environment(**test_param_dict)
 
         if self.test_ep_counter == self.nb_test_episodes:
             self.test_ep_counter = 0

@@ -6,7 +6,7 @@ import time
 from teachers.sagg_iac import SAGG_IAC
 from teachers.algos.riac import RIAC
 from teachers.algos.florensa_riac import Florensa_RIAC
-from teachers.algos.alp_gmm import InterestGMM
+from teachers.algos.alp_gmm import ALPGMM
 from teachers.algos.covar_gmm import CovarGMM
 #from teachers.algos.cma_es import InterestCMAES
 import pickle
@@ -261,7 +261,7 @@ def test_riac(env, nb_episodes, gif=False, nb_dims=2, score_step=1000, verbose=T
     return scores
 
 def test_interest_gmm(env, nb_episodes, gif=False, nb_dims=2, score_step=1000, verbose=True, params={}):
-    goal_generator = InterestGMM([0]*nb_dims, [1]*nb_dims, params=params)
+    goal_generator = ALPGMM([0] * nb_dims, [1] * nb_dims, params=params)
     rewards = []
     scores = []
     bk = {'weights':[], 'covariances':[], 'means':[], 'goals_lps':[], 'episodes':[],

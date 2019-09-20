@@ -44,19 +44,19 @@ class EmpiricalLearningProgress():
         self.interest_knn.add_xy(competence, goal)
         return interest
 
-class InterestGMM():
+class ALPGMM():
     def __init__(self, mins, maxs, n_components=None, seed=None, params=dict(), random_goal_ratio=0.2,
                  gmm_fitness_fun='bic'):
         self.seed = seed
         if not seed:
             self.seed = np.random.randint(42,424242)
         np.random.seed(self.seed)
-        self.mins = mins
-        self.maxs = maxs
+        self.mins = np.array(mins)
+        self.maxs = np.array(maxs)
 
         self.normalize_reward = False if "normalize reward" not in params else params["normalize reward"]
         if self.normalize_reward:
-            self.max_reward = np.max(np.array(maxs) - np.array(mins)) # reward is scaled according to largest goal space
+            self.max_reward = np.max(self.maxs - self.mins) # reward is scaled according to largest goal space
 
         self.potential_ks = np.arange(2,11,1) if "potential_ks" not in params else params["potential_ks"]
         self.warm_start = False if "warm_start" not in params else params["warm_start"]
@@ -69,7 +69,7 @@ class InterestGMM():
         # print(self.potential_ks[0])
         # print(self.potential_ks[-1])
         # print(self.use_weighted_gmm)
-        self.random_goal_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
+        self.random_goal_generator = Box(self.mins, self.maxs, dtype=np.float32)
         self.lp_computer = EmpiricalLearningProgress(len(mins))
         self.goals = []
         self.lps = []
@@ -104,7 +104,7 @@ class InterestGMM():
         return nb_gmms * params_per_gmm - 1
 
 
-    def update(self, goals, competences,all_rewards=None):
+    def update(self, goals, competences):
         if not isinstance(competences, list):
             competences = [competences]
         if (not isinstance(goals[0], list)) and (not isinstance(goals[0], np.ndarray)):
@@ -153,7 +153,7 @@ class InterestGMM():
                 self.bk['goals_lps'] = self.goals_lps
                 self.bk['episodes'].append(len(self.goals))
 
-    def sample_goal(self, kwargs=None, n_samples=1):
+    def sample_goal(self, n_samples=1):
         new_goals = []
         if (len(self.goals) < self.nb_random) or (np.random.random() < self.random_goal_ratio):  # random goals until enough data is collected
             new_goals = [self.random_goal_generator.sample() for _ in range(n_samples)]
@@ -172,12 +172,12 @@ class InterestGMM():
                     new_goal = np.random.multivariate_normal(self.gmm.means_[idx], self.gmm.covariances_[idx])[:-d]
                 else:
                     new_goal = np.random.multivariate_normal(self.gmm.means_[idx], self.gmm.covariances_[idx])[:-1]
-                new_goals.append(np.clip(new_goal, self.mins, self.maxs))
+                new_goals.append(np.clip(new_goal, self.mins, self.maxs).astype(np.float32))
 
         if n_samples == 1:
-            return new_goals[0].tolist()
+            return new_goals[0]
         else:
-            return np.array(new_goals)
+            return np.array(new_goals, dtype=np.float32)
 
     def dump(self, dump_dict):
         dump_dict.update(self.bk)

@@ -50,7 +50,7 @@ Soft Actor-Critic
 def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=100000, epochs=100, replay_size=int(1e6), gamma=0.99,
         polyak=0.995, lr=1e-3, alpha=0.005, batch_size=100, start_steps=10000,
-        max_ep_len=2000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_kwargs=dict(), env_init=dict(),
+        max_ep_len=2000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_init=dict(),
         env_name='unknown', nb_test_episodes=50, train_freq=1, teacher_params={}):
     """
 
@@ -135,7 +135,9 @@ def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
 
 
     logger = EpochLogger(**logger_kwargs)
-    logger.save_config(locals())
+    hyperparams = locals()
+    del hyperparams['Teacher'] # remove teacher to avoid serialization error
+    logger.save_config(hyperparams)
 
     tf.set_random_seed(seed)
     np.random.seed(seed)
@@ -147,7 +149,7 @@ def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
         test_env.env.my_init(env_init)
 
 
-    if env_babbling is not "none": Teacher.set_env_params(env,env_kwargs)
+    if env_babbling is not "none": Teacher.set_env_params(env)
     env.reset()
 
     obs_dim = env.env.observation_space.shape[0]
@@ -238,7 +240,7 @@ def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
     def test_agent(n=10):
         global sess, mu, pi, q1, q2, q1_pi, q2_pi
         for j in range(n):
-            if env_babbling is not "none": Teacher.set_test_env_params(test_env, env_kwargs)
+            if env_babbling is not "none": Teacher.set_test_env_params(test_env)
             o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
             while not(d or (ep_len == max_ep_len)):
                 # Take deterministic actions at test time 
@@ -304,7 +306,7 @@ def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             Teacher.record_train_episode(ep_ret, ep_len)
-            if env_babbling is not "none": Teacher.set_env_params(env, env_kwargs)
+            if env_babbling is not "none": Teacher.set_env_params(env)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
 
         # End of epoch wrap-up

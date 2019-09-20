@@ -37,9 +37,12 @@ class RIAC():
         self.maxlen = 200 if "max_region_size" not in params else params['max_region_size']
         self.window_cp = self.maxlen if "lp_window_size" not in params else params['lp_window_size']
 
+        self.mins = np.array(mins)
+        self.maxs = np.array(maxs)
+
         # init regions' tree
         self.tree = Tree()
-        self.regions_bounds = [Box(mins, maxs, dtype=np.float32)]
+        self.regions_bounds = [Box(self.mins, self.maxs, dtype=np.float32)]
         self.interest = [0.]
         self.tree.create_node('root', 'root',
                               data=Region(maxlen=self.maxlen,
@@ -57,7 +60,7 @@ class RIAC():
         self.minlen = self.maxlen / 20 if "min_reg_size" not in params else params['min_reg_size']
 
         # 2 - minimum children region size (compared to initial range of each dimension)
-        self.dims_ranges = maxs - mins
+        self.dims_ranges = self.maxs - self.mins
         self.min_dims_range_ratio = 1/15 if "min_dims_range_ratio" not in params else params["min_dims_range_ratio"]
 
         # if after nb_split_attempts, no split is valid, flush oldest points of parent region
@@ -166,7 +169,7 @@ class RIAC():
                 self.nodes_to_split.append(nid)
 
 
-    def update(self, goal, continuous_competence, all_raw_rewards):
+    def update(self, goal, continuous_competence):
         self.update_nb += 1
         # add new (goal, competence) to regions nodes
         self.nodes_to_split = []
@@ -215,7 +218,7 @@ class RIAC():
     def draw_random_goal(self):
         return self.regions_bounds[0].sample()  # first region is root region
 
-    def sample_goal(self, args):
+    def sample_goal(self):
         mode = np.random.rand()
         if mode < 0.1:  # "mode 3" (10%) -> sample on regions and then mutate lowest-performing goal in region
             if len(self.sampled_goals) == 0:
@@ -236,7 +239,7 @@ class RIAC():
             region_id = proportional_choice(self.interest, eps=0.0)
             self.sampled_goals.append(self.regions_bounds[region_id].sample())
 
-        return self.sampled_goals[-1]
+        return self.sampled_goals[-1].astype(np.float32)
 
     def dump(self, dump_dict):
         dump_dict['all_boxes'] = self.all_boxes

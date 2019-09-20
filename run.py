@@ -4,6 +4,7 @@ from spinup.algos.sac.sac import sac
 from spinup.algos.sac import core
 import gym
 from teachers.teacher_controller import EnvParamsSelector
+from collections import OrderedDict
 
 parser = argparse.ArgumentParser()
 
@@ -73,6 +74,23 @@ ac_kwargs = dict()
 if args.hid != -1:
     ac_kwargs['hidden_sizes'] = [args.hid] * args.l
 
+# Set bounds for environment's parameter space [min, max, nb_dimensions] (if no nb_dimensions, assumes only 1)
+# WARNING order matters !
+param_env_bounds = OrderedDict()
+if args.max_stump_h is not None:
+    param_env_bounds['stump_height'] = [0, args.max_stump_h]
+if args.max_stump_w is not None:
+    param_env_bounds['stump_width'] = [0, args.max_stump_w]
+if args.max_stump_r is not None:
+    param_env_bounds['stump_rot'] = [0, args.max_stump_r]
+if args.max_obstacle_spacing is not None:
+    param_env_bounds['obstacle_spacing'] = [0, args.max_obstacle_spacing]
+if args.poly_shape:
+    param_env_bounds['poly_shape'] = [0, 4.0, 12]
+if args.stump_seq:
+    param_env_bounds['stump_seq'] = [0, 6.0, 10]
+
+# Set teacher hyperparameters
 params = {}
 if args.env_babbling == 'gmm':
     if args.gmm_fitness_fun is not None:
@@ -95,25 +113,28 @@ elif args.env_babbling == "riac":
         params['max_region_size'] = args.max_region_size
     if args.lp_window_size is not None:
         params['lp_window_size'] = args.lp_window_size
+elif args.env_babbling == "oracle":
+    if 'stump_height' in param_env_bounds and 'obstacle_spacing' in param_env_bounds:
+        params['window_step_vector'] = [0.1, -0.2]  # order must match param_env_bounds construction
+    elif 'poly_shape' in param_env_bounds:
+        params['window_step_vector'] = [0.1] * 12
+        print('hih')
+    elif 'stump_seq' in param_env_bounds:
+        params['window_step_vector'] = [0.1] * 10
+    else:
+        print('oracle not defined for this parameter space')
+        exit(1)
 
-env_kwargs = {'roughness': args.roughness,
-              'stump_height': None if args.max_stump_h is None else [0, args.max_stump_h],
-              'stump_width': None if args.max_stump_w is None else [0, args.max_stump_w],
-              'stump_rot': None if args.max_stump_r is None else [0, args.max_stump_r],
-              'obstacle_spacing': None if args.max_obstacle_spacing is None else [0, args.max_obstacle_spacing],
-              'poly_shape': None if not args.poly_shape else [0, 4.0],
-              'stump_seq': None if not args.stump_seq else [0, 6.0],
-              'gap_width': args.max_gap_w,
-              'step_height': args.step_h,
-              'step_number': args.step_nb,
-              'env_param_input': args.env_param_input}
+print('env_param_bounds')
+print(param_env_bounds)  # todo remove
+
 env_f = lambda: gym.make(args.env)
 env_init = {}
 if args.env == "flowers-Walker-continuous-v0":
     env_init['leg_size'] = args.leg_size
 
 # Initialize teacher
-Teacher = EnvParamsSelector(args.env_babbling, args.nb_test_episodes, env_kwargs,
+Teacher = EnvParamsSelector(args.env_babbling, args.nb_test_episodes, param_env_bounds,
                             seed=args.seed, teacher_params=params)
 
 # Launch Student training
@@ -122,6 +143,6 @@ sac(env_f, Teacher, actor_critic=core.mlp_actor_critic,
     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
     logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
     steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size,
-    env_babbling=args.env_babbling, env_kwargs=env_kwargs, env_init=env_init,
+    env_babbling=args.env_babbling, env_init=env_init,
     env_name=args.env, nb_test_episodes=args.nb_test_episodes, lr=args.lr, train_freq=args.train_freq,
     batch_size=args.batch_size, teacher_params=params)
