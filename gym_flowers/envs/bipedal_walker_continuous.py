@@ -242,12 +242,11 @@ class BipedalWalkerContinuous(gym.Env, EzPickle):
                         env_param_input=False, poly_shape=None, stump_seq=None):
         #print('SETTING ENV')
         #print(obstacle_spacing)
-        assert((step_height and step_number) or (not(step_height and step_number)))
         self.env_param_input = env_param_input
 
         self.roughness = roughness if roughness else 0
         self.obstacle_spacing = max(0.01, obstacle_spacing) if obstacle_spacing is not None else 8.0
-        self.stump_height = stump_height # [1,3]
+        self.stump_height = [stump_height, 0.1] if stump_height is not None else None # [1,3]
         self.stump_width = stump_width
         self.stump_rot = stump_rot
         self.gap_width = gap_width # [3,5]
