@@ -40,7 +40,7 @@ class OracleTeacher():
                         self.window_pos[i] = max(self.window_pos[i] + step, self.mins[i])
                 print('mut stump: mean_ret:{} window_pos:({})'.format(mean_reward, self.window_pos))
 
-    def sample_goal(self):
+    def sample_task(self):
         task = np.random.uniform(self.window_pos, self.window_pos+self.window_range).astype(np.float32)
         #print(task)
         return task

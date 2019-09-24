@@ -6,26 +6,26 @@ from teachers.algos.gep_utils import proportional_choice
 
 
 class EmpiricalLearningProgress():
-    def __init__(self, goal_size):
-        self.interest_knn = BufferedDataset(1, goal_size, buffer_size=500, lateness=0)
+    def __init__(self, task_size):
+        self.interest_knn = BufferedDataset(1, task_size, buffer_size=500, lateness=0)
         #self.window_size = 1000
 
-    def get_lp(self, goal, competence):
+    def get_lp(self, task, competence):
         interest = 0
         if len(self.interest_knn) > 5:
-            # compute learning progre   ss for new goal
-            dist, idx = self.interest_knn.nn_y(goal)
-            # closest_previous_goal = previous_goals[idx]
-            closest_previous_goal = self.interest_knn.get_y(idx[0])
-            closest_previous_goal_competence = self.interest_knn.get_x(idx[0])
-            # print 'closest previous goal is index:%s, val: %s' % (idx[0], closest_previous_goal)
+            # compute learning progre   ss for new task
+            dist, idx = self.interest_knn.nn_y(task)
+            # closest_previous_task = previous_tasks[idx]
+            closest_previous_task = self.interest_knn.get_y(idx[0])
+            closest_previous_task_competence = self.interest_knn.get_x(idx[0])
+            # print 'closest previous task is index:%s, val: %s' % (idx[0], closest_previous_task)
 
             # compute Progress as absolute difference in competence
-            progress = closest_previous_goal_competence - competence
+            progress = closest_previous_task_competence - competence
             interest = np.abs(progress)
 
         # add to database
-        self.interest_knn.add_xy(competence, goal)
+        self.interest_knn.add_xy(competence, task)
         return interest
 
 class EGEP():
@@ -82,7 +82,7 @@ class EGEP():
                 self.elite_tasks_lps = self.elite_tasks_lps[1:]
                 self.elite_tasks_nb_mutations = self.elite_tasks_nb_mutations[1:]
 
-    def sample_goal(self, kwargs=None, n_samples=1):
+    def sample_task(self, kwargs=None, n_samples=1):
         if (len(self.tasks) < self.nb_bootstrap) or (np.random.random() < self.random_task_ratio):
             new_task = self.random_task_generator.sample()
         else:

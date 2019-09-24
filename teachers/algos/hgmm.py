@@ -105,26 +105,26 @@ class MultivariateGaussian():
         return ([np.random.normal(self.mus, self.stds)], None)
 
 class EmpiricalLearningProgress():
-    def __init__(self, goal_size):
-        self.interest_knn = BufferedDataset(1, goal_size, buffer_size=2000, lateness=0)
+    def __init__(self, task_size):
+        self.interest_knn = BufferedDataset(1, task_size, buffer_size=2000, lateness=0)
         #self.window_size = 1000
 
-    def get_lp(self, goal, competence):
+    def get_lp(self, task, competence):
         interest = 0
         if len(self.interest_knn) > 5:
-            # compute learning progre   ss for new goal
-            dist, idx = self.interest_knn.nn_y(goal)
-            # closest_previous_goal = previous_tasks[idx]
-            closest_previous_goal = self.interest_knn.get_y(idx[0])
-            closest_previous_goal_competence = self.interest_knn.get_x(idx[0])
-            # print 'closest previous goal is index:%s, val: %s' % (idx[0], closest_previous_goal)
+            # compute learning progre   ss for new task
+            dist, idx = self.interest_knn.nn_y(task)
+            # closest_previous_task = previous_tasks[idx]
+            closest_previous_task = self.interest_knn.get_y(idx[0])
+            closest_previous_task_competence = self.interest_knn.get_x(idx[0])
+            # print 'closest previous task is index:%s, val: %s' % (idx[0], closest_previous_task)
 
             # compute Progress as absolute difference in competence
-            progress = closest_previous_goal_competence - competence
+            progress = closest_previous_task_competence - competence
             interest = np.abs(progress)
 
         # add to database
-        self.interest_knn.add_xy(competence, goal)
+        self.interest_knn.add_xy(competence, task)
         return interest
 
 class HGMM():
@@ -221,7 +221,7 @@ class HGMM():
                 self.bk['tasks'] = self.tasks
                 self.bk['episodes'].append(len(self.tasks))
 
-    def sample_goal(self, kwargs=None):
+    def sample_task(self, kwargs=None):
         if (len(self.tasks) < self.nb_random) or (np.random.random() < self.random_task_ratio):  # random tasks until enough data is collected
             new_task = self.random_task_generator.sample()
         else:

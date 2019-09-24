@@ -11,13 +11,13 @@ class RandomTeacher():
         self.mins = mins
         self.maxs = maxs
 
-        self.random_goal_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
+        self.random_task_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
 
-    def update(self, goal, competence):
+    def update(self, task, competence):
         pass
 
-    def sample_goal(self):
-        return self.random_goal_generator.sample()
+    def sample_task(self):
+        return self.random_task_generator.sample()
 
     def dump(self, dump_dict):
         return dump_dict

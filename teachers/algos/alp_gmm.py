@@ -1,16 +1,7 @@
-import matplotlib.pyplot as plt
-import seaborn as sns; sns.set()
-from matplotlib.patches import Ellipse
-import numpy as np
-from sklearn.datasets.samples_generator import make_blobs
 from sklearn.mixture import GaussianMixture as GMM
-from sklearn.datasets import make_moons
 import numpy as np
-import copy
 from gym.spaces import Box
 from teachers.utils.dataset import BufferedDataset
-from teachers.algos.dwgmm import DimensionallyWeightedGMM
-
 
 
 def proportional_choice(v, eps=0.):
@@ -20,81 +11,76 @@ def proportional_choice(v, eps=0.):
         probas = np.array(v) / np.sum(v)
         return np.where(np.random.multinomial(1, probas) == 1)[0][0]
 
+# Absolute Learning Progress (ALP) computer object
+# It uses a buffered kd-tree to efficiently implement a k-nearest-neighbor algorithm
+class EmpiricalALPComputer():
+    def __init__(self, task_size):
+        self.alp_knn = BufferedDataset(1, task_size, buffer_size=500, lateness=0)
 
-class EmpiricalLearningProgress():
-    def __init__(self, goal_size):
-        self.interest_knn = BufferedDataset(1, goal_size, buffer_size=500, lateness=0)
-        #self.window_size = 1000
+    def compute_alp(self, task, reward):
+        alp = 0
+        if len(self.alp_knn) > 5:
+            # Compute absolute learning progress for new task
+            
+            # 1 - Retrieve closest previous task
+            dist, idx = self.alp_knn.nn_y(task)
+            
+            # 2 - Retrieve corresponding reward
+            closest_previous_task_reward = self.alp_knn.get_x(idx[0])
 
-    def get_lp(self, goal, competence):
-        interest = 0
-        if len(self.interest_knn) > 5:
-            # compute learning progre   ss for new goal
-            dist, idx = self.interest_knn.nn_y(goal)
-            # closest_previous_goal = previous_goals[idx]
-            closest_previous_goal = self.interest_knn.get_y(idx[0])
-            closest_previous_goal_competence = self.interest_knn.get_x(idx[0])
-            # print 'closest previous goal is index:%s, val: %s' % (idx[0], closest_previous_goal)
+            # 3 - Compute alp as absolute difference in reward
+            lp = reward - closest_previous_task_reward
+            alp = np.abs(lp)
 
-            # compute Progress as absolute difference in competence
-            progress = closest_previous_goal_competence - competence
-            interest = np.abs(progress)
+        # Add to database
+        self.alp_knn.add_xy(reward, task)
+        return alp
 
-        # add to database
-        self.interest_knn.add_xy(competence, goal)
-        return interest
-
+# Absolute Learning Progress - Gaussian Mixture Model
+# mins / maxs are vectors defining task space boundaries (ex: mins=[0,0,0] maxs=[1,1,1])
 class ALPGMM():
-    def __init__(self, mins, maxs, n_components=None, seed=None, params=dict(), random_goal_ratio=0.2,
-                 gmm_fitness_fun='bic'):
+    def __init__(self, mins, maxs, seed=None, params=dict()):
         self.seed = seed
         if not seed:
             self.seed = np.random.randint(42,424242)
         np.random.seed(self.seed)
+
+        # Task space boundaries
         self.mins = np.array(mins)
         self.maxs = np.array(maxs)
 
-        self.normalize_reward = False if "normalize reward" not in params else params["normalize reward"]
-        if self.normalize_reward:
-            self.max_reward = np.max(self.maxs - self.mins) # reward is scaled according to largest goal space
-
+        # Range of number of Gaussians to try when fitting the GMM
         self.potential_ks = np.arange(2,11,1) if "potential_ks" not in params else params["potential_ks"]
+        # Restart new fit by initializing with last fit
         self.warm_start = False if "warm_start" not in params else params["warm_start"]
+        # Fitness criterion when selecting best GMM among range of GMMs varying in number of Gaussians.
         self.gmm_fitness_fun = "aic" if "gmm_fitness_fun" not in params else params["gmm_fitness_fun"]
-        self.use_weighted_gmm = False if "weighted_gmm" not in params else True
+        # Number of Expectation-Maximization trials when fitting
         self.nb_em_init = 1 if "nb_em_init" not in params else params['nb_em_init']
-        self.multiply_lp = False if "multiply_lp" not in params else params['multiply_lp']
-        # print(self.warm_start)
-        # print(self.gmm_fitness_fun)
-        # print(self.potential_ks[0])
-        # print(self.potential_ks[-1])
-        # print(self.use_weighted_gmm)
-        self.random_goal_generator = Box(self.mins, self.maxs, dtype=np.float32)
-        self.lp_computer = EmpiricalLearningProgress(len(mins))
-        self.goals = []
-        self.lps = []
-        self.goals_lps = []
+        # Number of episodes between two fit of the GMM
         self.fit_rate = 250 if "fit_rate" not in params else params['fit_rate']
-        self.nb_random = self.fit_rate
-        self.random_goal_ratio = random_goal_ratio
-        self.window = self.fit_rate
+        self.nb_random = self.fit_rate  # Number of bootstrapping episodes
 
-        # init GMMs
+        # Ratio of randomly sampled tasks VS tasks sampling using GMM
+        self.random_task_ratio = 0.2 if "random_task_ratio" not in params else params["random_task_ratio"]
+        self.random_task_generator = Box(self.mins, self.maxs, dtype=np.float32)
+
+        # Init ALP computer
+        self.alp_computer = EmpiricalALPComputer(len(mins))
+
+        self.tasks = []
+        self.alps = []
+        self.tasks_alps = []
+
+        # Init GMMs
         self.potential_gmms = [self.init_gmm(k) for k in self.potential_ks]
 
-        # boring book-keeping
-        self.bk = {'weights': [], 'covariances': [], 'means': [], 'goals_lps': [], 'episodes': [],
-              'comp_grids': [], 'comp_xs': [], 'comp_ys': []}
+        # Boring book-keeping
+        self.bk = {'weights': [], 'covariances': [], 'means': [], 'tasks_alps': [], 'episodes': []}
 
     def init_gmm(self, nb_gaussians):
-        if self.use_weighted_gmm:
-            return DimensionallyWeightedGMM(n_components=nb_gaussians, covariance_type='full',
-                   warm_start=self.warm_start)
-        else:
-            return GMM(n_components=nb_gaussians, covariance_type='full', random_state=self.seed,
+        return GMM(n_components=nb_gaussians, covariance_type='full', random_state=self.seed,
                                             warm_start=self.warm_start, n_init=self.nb_em_init)
-
-
     def get_nb_gmm_params(self, gmm):
         # assumes full covariance
         # see https://stats.stackexchange.com/questions/229293/the-number-of-parameters-in-gaussian-mixture-model
@@ -103,81 +89,68 @@ class ALPGMM():
         params_per_gmm = (d*d - d)/2 + 2*d + 1
         return nb_gmms * params_per_gmm - 1
 
+    def update(self, task, reward):
+        self.tasks.append(task)
 
-    def update(self, goals, competences):
-        if not isinstance(competences, list):
-            competences = [competences]
-        if (not isinstance(goals[0], list)) and (not isinstance(goals[0], np.ndarray)):
-            goals = [goals]
-        for g, c in zip(goals, competences):
-            self.goals.append(g)
-            if self.normalize_reward:
-                c = np.interp(c,[0,1],[0,self.max_reward])
-            self.lps.append(self.lp_computer.get_lp(g, c))
-            if self.multiply_lp:
-                self.goals_lps.append(np.array(g.tolist()+[self.lps[-1]]*len(self.mins)))
-            else:
-                self.goals_lps.append(np.array(g.tolist() + [self.lps[-1]]))
+        # Compute corresponding ALP
+        self.alps.append(self.alp_computer.compute_alp(task, reward))
 
-        #re-fit
-        if len(self.goals) >= self.nb_random:
-            if (len(self.goals) % self.fit_rate) == 0:
-                #print(np.array(self.goals_lps).shape)
-                #print(np.array(self.goals_lps))
-                cur_goals_lps = np.array(self.goals_lps[-self.window:])
-                self.potential_gmms = [g.fit(cur_goals_lps) for g in self.potential_gmms]#  fit all
+        # Concatenate task vector with ALP dimension
+        self.tasks_alps.append(np.array(task.tolist() + [self.alps[-1]]))
+
+        if len(self.tasks) >= self.nb_random:  # If initial bootstrapping is done
+            if (len(self.tasks) % self.fit_rate) == 0:  # Time to fit
+                # 1 - Retrieve last <fit_rate> (task, reward) pairs
+                cur_tasks_alps = np.array(self.tasks_alps[-self.fit_rate:])
+
+                # 2 - Fit batch of GMMs with varying number of Gaussians
+                self.potential_gmms = [g.fit(cur_tasks_alps) for g in self.potential_gmms]
+
+                # 3 - Compute fitness and keep best GMM
                 fitnesses = []
-                if self.gmm_fitness_fun == 'bic':
-                    fitnesses = [m.bic(cur_goals_lps) for m in self.potential_gmms]
-                elif self.gmm_fitness_fun == 'aic':
-                    fitnesses = [m.aic(cur_goals_lps) for m in self.potential_gmms]
-                elif self.gmm_fitness_fun == 'aicc':
+                if self.gmm_fitness_fun == 'bic':  # Bayesian Information Criterion
+                    fitnesses = [m.bic(cur_tasks_alps) for m in self.potential_gmms]
+                elif self.gmm_fitness_fun == 'aic':  # Akaike Information Criterion
+                    fitnesses = [m.aic(cur_tasks_alps) for m in self.potential_gmms]
+                elif self.gmm_fitness_fun == 'aicc':  # Modified AIC
                     n = self.fit_rate
                     fitnesses = []
                     for l, m in enumerate(self.potential_gmms):
                         k = self.get_nb_gmm_params(m)
                         penalty = (2*k*(k+1)) / (n-k-1)
-                        fitnesses.append(m.aic(cur_goals_lps) + penalty)
+                        fitnesses.append(m.aic(cur_tasks_alps) + penalty)
                 else:
                     raise NotImplementedError
                     exit(1)
-                # plt.plot(self.potential_ks, fitnesses, label='AIC')
-                # plt.show(block=False)
-                # plt.pause(0.5)
                 self.gmm = self.potential_gmms[np.argmin(fitnesses)]
 
                 # book-keeping
                 self.bk['weights'].append(self.gmm.weights_.copy())
                 self.bk['covariances'].append(self.gmm.covariances_.copy())
                 self.bk['means'].append(self.gmm.means_.copy())
-                self.bk['goals_lps'] = self.goals_lps
-                self.bk['episodes'].append(len(self.goals))
+                self.bk['tasks_alps'] = self.tasks_alps
+                self.bk['episodes'].append(len(self.tasks))
 
-    def sample_goal(self, n_samples=1):
-        new_goals = []
-        if (len(self.goals) < self.nb_random) or (np.random.random() < self.random_goal_ratio):  # random goals until enough data is collected
-            new_goals = [self.random_goal_generator.sample() for _ in range(n_samples)]
+    def sample_task(self):
+        if (len(self.tasks) < self.nb_random) or (np.random.random() < self.random_task_ratio):
+            # Random task sampling
+            new_task = self.random_task_generator.sample()
         else:
-            self.lp_means = []
-            self.lp_stds = []
-            for pos, covar, w in zip(self.gmm.means_, self.gmm.covariances_, self.gmm.weights_):
-                self.lp_means.append(pos[-1])
-                self.lp_stds.append(covar[-1,-1])
-            for _ in range(n_samples):
-                # sample gaussian
-                idx = proportional_choice(self.lp_means, eps=0.0)
-                # sample goal in gaussian, without forgetting to remove learning progress dimension
-                if self.multiply_lp:
-                    d = len(self.mins)
-                    new_goal = np.random.multivariate_normal(self.gmm.means_[idx], self.gmm.covariances_[idx])[:-d]
-                else:
-                    new_goal = np.random.multivariate_normal(self.gmm.means_[idx], self.gmm.covariances_[idx])[:-1]
-                new_goals.append(np.clip(new_goal, self.mins, self.maxs).astype(np.float32))
+            # ALP-based task sampling
 
-        if n_samples == 1:
-            return new_goals[0]
-        else:
-            return np.array(new_goals, dtype=np.float32)
+            # 1 - Retrieve the mean ALP value of each Gaussian in the GMM
+            self.alp_means = []
+            for pos, _, w in zip(self.gmm.means_, self.gmm.covariances_, self.gmm.weights_):
+                self.alp_means.append(pos[-1])
+
+            # 2 - Sample Gaussian proportionally to its mean ALP
+            idx = proportional_choice(self.alp_means, eps=0.0)
+
+            # 3 - Sample task in Gaussian, without forgetting to remove ALP dimension
+            new_task = np.random.multivariate_normal(self.gmm.means_[idx], self.gmm.covariances_[idx])[:-1]
+            new_task = np.clip(new_task, self.mins, self.maxs).astype(np.float32)
+
+        return new_task
 
     def dump(self, dump_dict):
         dump_dict.update(self.bk)

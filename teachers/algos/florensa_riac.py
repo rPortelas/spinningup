@@ -11,7 +11,7 @@ import matplotlib.patches as patches
 
 class Region(object):
 
-    def __init__(self, min_border, max_border, max_history=500, max_goals=500, num_random_splits=50, mode3_noise=0.1):
+    def __init__(self, min_border, max_border, max_history=500, max_tasks=500, num_random_splits=50, mode3_noise=0.1):
         # self.states = collections.deque(maxlen=max_history)
         # self.competences = collections.deque(maxlen=max_history)
 
@@ -20,8 +20,8 @@ class Region(object):
 
         self.min_border = min_border
         self.max_border = max_border
-        self.num_goals = 0
-        self.max_goals = max_goals
+        self.num_tasks = 0
+        self.max_tasks = max_tasks
         self.max_history = max_history
         self.num_random_splits = num_random_splits
         self.mode3_noise = mode3_noise
@@ -30,13 +30,13 @@ class Region(object):
     def add_state(self, state, competence):
         self.states.append(state)
         self.competences.append(competence)
-        self.num_goals += 1
+        self.num_tasks += 1
 
     def is_too_big(self):
-        # Split this region if it has too many goals, and if some of the goals have a positive competence!
+        # Split this region if it has too many tasks, and if some of the tasks have a positive competence!
         # Otherwise, if the competences are all 0, then there is no point in splitting.
         #print("Min competence: " + str(min(self.competences)) + " max competence: " + str(max(self.competences)))
-        do_split = (self.num_goals > self.max_goals) # and sum(self.competences) > 0)
+        do_split = (self.num_tasks > self.max_tasks) # and sum(self.competences) > 0)
         #if do_split:
             #print("Splitting!")
             #import pdb; pdb.set_trace()
@@ -54,7 +54,7 @@ class Region(object):
         return [region1, region2, success]
 
     def assign_states_to_regions(self, region1, region2):
-        # Reassign all goals to one of these regions.
+        # Reassign all tasks to one of these regions.
         for state, competence in zip(self.states, self.competences):
             if region1.contains(state):
                 region1.add_state(state, competence)
@@ -98,12 +98,12 @@ class Region(object):
         region1_min = np.copy(self.min_border)
         region1_max = np.copy(self.max_border)
         region1_max[split_dim] = split_val
-        region1 = Region(region1_min, region1_max, max_history=self.max_history, max_goals=self.max_goals)
+        region1 = Region(region1_min, region1_max, max_history=self.max_history, max_tasks=self.max_tasks)
 
         region2_min = np.copy(self.min_border)
         region2_min[split_dim] = split_val
         region2_max = np.copy(self.max_border)
-        region2 = Region(region2_min, region2_max, max_history=self.max_history, max_goals=self.max_goals)
+        region2 = Region(region2_min, region2_max, max_history=self.max_history, max_tasks=self.max_tasks)
 
         return [region1, region2]
 
@@ -112,12 +112,12 @@ class Region(object):
         region1_min = np.copy(self.min_border)
         region1_max = np.copy(self.max_border)
         region1_max[0] = (self.min_border[0] + self.max_border[0])/2 # Cut the first dimension in half.
-        region1 = Region(region1_min, region1_max, max_history=self.max_history, max_goals=self.max_goals)
+        region1 = Region(region1_min, region1_max, max_history=self.max_history, max_tasks=self.max_tasks)
 
         region2_min = np.copy(self.min_border)
         region2_min[0] = (self.min_border[0] + self.max_border[0])/2 # Cut the first dimension in half.
         region2_max = np.copy(self.max_border)
-        region2 = Region(region2_min, region2_max, max_history=self.max_history, max_goals=self.max_goals)
+        region2 = Region(region2_min, region2_max, max_history=self.max_history, max_tasks=self.max_tasks)
 
         return [region1, region2]
 
@@ -153,13 +153,13 @@ class Region(object):
         return state
 
     def sample_mode3(self):
-        # Find the lowest competence goal in this region.
+        # Find the lowest competence task in this region.
         min_index, min_value = min(enumerate(self.competences), key=operator.itemgetter(1))
-        bad_goal = np.copy(self.states[min_index])
+        bad_task = np.copy(self.states[min_index])
 
-        # Add noise to this goal.
-        bad_goal += np.random.normal(0, self.mode3_noise, len(bad_goal))
-        return bad_goal.tolist()
+        # Add noise to this task.
+        bad_task += np.random.normal(0, self.mode3_noise, len(bad_task))
+        return bad_task.tolist()
 
 
 class Florensa_RIAC(object):
@@ -167,9 +167,9 @@ class Florensa_RIAC(object):
     def __init__(self, min_border, max_border, params=dict()):
         self.mode1_p = 0.7 # Percent samples from high-interest regions
         self.mode2_p = 0.2 # Percent sampled from whole space
-        self.mode3_p = 0.1 # Percent sampled from mode 3 (low-performing goals in high-interest regions)
+        self.mode3_p = 0.1 # Percent sampled from mode 3 (low-performing tasks in high-interest regions)
 
-        self.max_goals = 500 if "max_region_size" not in params else params['max_region_size']
+        self.max_tasks = 500 if "max_region_size" not in params else params['max_region_size']
         max_history = 100 if "lp_window_size" not in params else params['lp_window_size']
         self.regions = []
 
@@ -177,7 +177,7 @@ class Florensa_RIAC(object):
         self.max_border = max_border
 
         # Create a region to represent the entire space.
-        self.whole_region = Region(self.min_border, self.max_border, max_history=max_history, max_goals=self.max_goals)
+        self.whole_region = Region(self.min_border, self.max_border, max_history=max_history, max_tasks=self.max_tasks)
         self.regions.append(self.whole_region)
 
     # Limit this sample to the boundaries of the region.
@@ -207,7 +207,7 @@ class Florensa_RIAC(object):
         # Add this state to the region.
         region.add_state(state, competence)
 
-        # If the region contains too many goals, split it into subregions.
+        # If the region contains too many tasks, split it into subregions.
         success=False
         if region.is_too_big():
             [region1, region2, success] = region.split()
@@ -221,18 +221,18 @@ class Florensa_RIAC(object):
         return success, None
 
     # Sample states from the regions.
-    def sample_goal(self,useless_jim):
+    def sample_task(self,useless_jim):
         num_samples = 1
         mode = np.random.rand()
-        if mode < 0.1:  # "mode 3" (10%) -> sample on regions and then mutate lowest-performing goal in region
+        if mode < 0.1:  # "mode 3" (10%) -> sample on regions and then mutate lowest-performing task in region
             samples_mode3 = self.sample_mode_3(num_samples)
             all_samples = samples_mode3
 
-        elif mode < 0.3:  # "mode 2" (20%) -> random goal
+        elif mode < 0.3:  # "mode 2" (20%) -> random task
             samples_mode2 = self.sample_uniform(num_samples)
             all_samples = samples_mode2
 
-        else:  # "mode 1" (70%) -> sampling on regions and then random goal in selected region
+        else:  # "mode 1" (70%) -> sampling on regions and then random task in selected region
             samples_mode1 = self.sample_mode_1(num_samples)
             all_samples = samples_mode1
 

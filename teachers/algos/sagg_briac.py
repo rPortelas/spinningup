@@ -14,8 +14,8 @@ class Region(object):
         self.interest = interest
         self.maxlen = maxlen
 
-    def add(self, goal, comp, is_leaf):
-        self.cps_gs[1].append(goal.copy())
+    def add(self, task, comp, is_leaf):
+        self.cps_gs[1].append(task.copy())
         self.cps_gs[0].append(comp)
 
         need_split = False
@@ -54,7 +54,7 @@ class SAGG_BRIAC():
         self.mode_3_noise = 0.1
 
         # book-keeping
-        self.sampled_goals = []
+        self.sampled_tasks = []
         self.all_boxes = []
         self.all_interests = []
         self.update_nb = 0
@@ -105,12 +105,12 @@ class SAGG_BRIAC():
                 # perform split in sub regions
                 sub_reg1 = [deque(maxlen=self.maxlen + 1), deque(maxlen=self.maxlen + 1)]
                 sub_reg2 = [deque(maxlen=self.maxlen + 1), deque(maxlen=self.maxlen + 1)]
-                for i, goal in enumerate(reg.cps_gs[1]):
-                    if bounds1.contains(goal):
-                        sub_reg1[1].append(goal)
+                for i, task in enumerate(reg.cps_gs[1]):
+                    if bounds1.contains(task):
+                        sub_reg1[1].append(task)
                         sub_reg1[0].append(reg.cps_gs[0][i])
                     else:
-                        sub_reg2[1].append(goal)
+                        sub_reg2[1].append(task)
                         sub_reg2[0].append(reg.cps_gs[0][i])
                 sub_regions = [sub_reg1, sub_reg2]
 
@@ -173,7 +173,7 @@ class SAGG_BRIAC():
         dadta.cps_gs[1] = deque(islice(dadta.cps_gs[1], int(self.maxlen / 4), self.maxlen + 1))
         self.nodes_to_recompute.append(parent_children[0][0].identifier)
 
-        # remove child from recompute list if they where touched when adding the current goal
+        # remove child from recompute list if they where touched when adding the current task
         if child1.identifier in self.nodes_to_recompute:
             self.nodes_to_recompute.pop(self.nodes_to_recompute.index(child1.identifier))
         if child2.identifier in self.nodes_to_recompute:
@@ -182,27 +182,27 @@ class SAGG_BRIAC():
 
 
 
-    def add_goal_comp(self, node, goal, comp):
+    def add_task_comp(self, node, task, comp):
         reg = node.data
         nid = node.identifier
-        if reg.bounds.contains(goal): # goal falls within region
+        if reg.bounds.contains(task): # task falls within region
             self.nodes_to_recompute.append(nid)
             children = self.tree.children(nid)
-            for n in children: # if goal in region, goal is in one sub-region
-                self.add_goal_comp(n, goal, comp)
+            for n in children: # if task in region, task is in one sub-region
+                self.add_task_comp(n, task, comp)
 
-            need_split = reg.add(goal, comp, children == []) # COPY ALL MODE
+            need_split = reg.add(task, comp, children == []) # COPY ALL MODE
             if need_split:
                 self.nodes_to_split.append(nid)
 
 
-    def update(self, goal, continuous_competence, all_raw_rewards):
-        # add new (goal, competence) to regions nodes
+    def update(self, task, continuous_competence, all_raw_rewards):
+        # add new (task, competence) to regions nodes
         self.nodes_to_split = []
         self.nodes_to_recompute = []
         new_split = False
         root = self.tree.get_node('root')
-        self.add_goal_comp(root, goal, continuous_competence)
+        self.add_task_comp(root, task, continuous_competence)
         #print(self.nodes_to_split)
         assert len(self.nodes_to_split) <= 1
 
@@ -228,7 +228,7 @@ class SAGG_BRIAC():
             reg = node.data
             reg.interest = self.compute_interest(reg.cps_gs)
 
-        # collect new interests and new [comp, goals] lists
+        # collect new interests and new [comp, tasks] lists
         all_nodes = self.tree.all_nodes()
         self.interest = []
         self.cps_gs = []
@@ -244,29 +244,29 @@ class SAGG_BRIAC():
 
         return new_split, None
 
-    def draw_random_goal(self):
+    def draw_random_task(self):
         return self.regions_bounds[0].sample()  # first region is root region
 
-    def sample_goal(self, args):
+    def sample_task(self, args):
         mode = np.random.rand()
-        if mode < 0.1:  # "mode 3" (10%) -> sample on regions and then mutate lowest-performing goal in region
-            if len(self.sampled_goals) == 0:
-                self.sampled_goals.append(self.draw_random_goal())
+        if mode < 0.1:  # "mode 3" (10%) -> sample on regions and then mutate lowest-performing task in region
+            if len(self.sampled_tasks) == 0:
+                self.sampled_tasks.append(self.draw_random_task())
             else:
                 region_id = proportional_choice(self.interest, eps=0.0)
-                worst_goal_idx = np.argmin(self.cps_gs[region_id][0])
-                # mutate goal by a small amount (i.e a gaussian scaled to the regions range)
-                goal = np.random.normal(self.cps_gs[region_id][1][worst_goal_idx].copy(), 0.1)
+                worst_task_idx = np.argmin(self.cps_gs[region_id][0])
+                # mutate task by a small amount (i.e a gaussian scaled to the regions range)
+                task = np.random.normal(self.cps_gs[region_id][1][worst_task_idx].copy(), 0.1)
                 # clip to stay within region (add small epsilon to avoid falling in multiple regions)
-                goal = np.clip(goal, self.regions_bounds[region_id].low + 1e-5, self.regions_bounds[region_id].high - 1e-5)
-                self.sampled_goals.append(goal)
+                task = np.clip(task, self.regions_bounds[region_id].low + 1e-5, self.regions_bounds[region_id].high - 1e-5)
+                self.sampled_tasks.append(task)
 
-        elif mode < 0.3:  # "mode 2" (20%) -> random goal
-            self.sampled_goals.append(self.draw_random_goal())
+        elif mode < 0.3:  # "mode 2" (20%) -> random task
+            self.sampled_tasks.append(self.draw_random_task())
 
-        else:  # "mode 1" (70%) -> sampling on regions and then random goal in selected region
+        else:  # "mode 1" (70%) -> sampling on regions and then random task in selected region
             region_id = proportional_choice(self.interest, eps=0.0)
-            self.sampled_goals.append(self.regions_bounds[region_id].sample())
+            self.sampled_tasks.append(self.regions_bounds[region_id].sample())
 
 
         # # sample region
@@ -275,16 +275,16 @@ class SAGG_BRIAC():
         # else:
         #     region_id = np.random.choice(range(self.nb_regions), p=np.array(self.probas))
 
-        # # sample goal
-        # self.sampled_goals.append(self.regions_bounds[region_id].sample())
+        # # sample task
+        # self.sampled_tasks.append(self.regions_bounds[region_id].sample())
         #
-        # return self.sampled_goals[-1].tolist()
+        # return self.sampled_tasks[-1].tolist()
         # sample region
         # region_id = proportional_choice(self.interest, eps=0.2)
-        # # sample goal
-        # self.sampled_goals.append(self.regions_bounds[region_id].sample())
+        # # sample task
+        # self.sampled_tasks.append(self.regions_bounds[region_id].sample())
 
-        return self.sampled_goals[-1]
+        return self.sampled_tasks[-1]
 
     def dump(self, dump_dict):
         dump_dict['all_boxes'] = self.all_boxes

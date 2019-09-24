@@ -27,24 +27,24 @@ class InterestCMAES():
         self.counter = 0
         self.current_generation = None
         self.current_fitnesses = []
-        self.random_goal = 0.0
-        self.random_goal_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
+        self.random_task = 0.0
+        self.random_task_generator = Box(np.array(mins), np.array(maxs), dtype=np.float32)
 
-    def sample_goal(self):
+    def sample_task(self):
         if self.counter == 0:
             self.current_fitnesses = []
             self.current_generation = np.array(self.es.ask())
             self.counter = self.popsize
 
         self.counter -= 1
-        if np.random.random() < self.random_goal:
+        if np.random.random() < self.random_task:
             #print('RANDOM GOAL')
-            # sample random goal
-            self.current_generation[self.counter] = self.random_goal_generator.sample()
+            # sample random task
+            self.current_generation[self.counter] = self.random_task_generator.sample()
         return np.array(self.current_generation[self.counter])
 
-    def update(self, goal, competence):  # WARNING GOALS ARENT CLIPPED
-        self.current_fitnesses.append(self.lp_computer.get_lp(goal, competence))
+    def update(self, task, competence):  # WARNING GOALS ARENT CLIPPED
+        self.current_fitnesses.append(self.lp_computer.get_lp(task, competence))
         if len(self.current_fitnesses) == self.popsize:
           # convert minimizer to maximizer.
           fitnesses = -np.array(self.current_fitnesses)
