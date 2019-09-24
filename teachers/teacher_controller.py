@@ -2,7 +2,6 @@ import numpy as np
 import pickle
 import os
 import copy
-from teachers.algos.sagg_iac import SAGG_IAC
 from teachers.algos.riac import RIAC
 from teachers.algos.alp_gmm import ALPGMM
 from teachers.algos.covar_gmm import CovarGMM
@@ -18,9 +17,9 @@ def get_sorted2d_params(v_min, v_max, eps=1e-3):
         random_2dparams[1] += eps
     return random_2dparams.tolist()
 
-def get_mu_sigma(v_min, v_max): #  assumes sigma has same bounds as mu
+def get_mu_sigma(v_min, v_max):  # assumes sigma has same bounds as mu
     random_2dparams = np.random.uniform(v_min, v_max, 2)
-    return random_2dparams.tolist() #  returning mu and sigma
+    return random_2dparams.tolist()  # returning mu and sigma
 
 def param_vec_to_param_dict(param_env_bounds, param):
     param_dict = OrderedDict()
@@ -46,8 +45,8 @@ def param_dict_to_param_vec(param_env_bounds, param_dict):  # needs param_env_bo
 
 
 class EnvParamsSelector(object):
-    def __init__(self, env_babbling, nb_test_episodes, param_env_bounds, seed=None, teacher_params={}):
-        self.env_babbling = env_babbling
+    def __init__(self, teacher, nb_test_episodes, param_env_bounds, seed=None, teacher_params={}):
+        self.teacher = teacher
         self.nb_test_episodes = nb_test_episodes
         self.test_ep_counter = 0
         self.eps= 1e-03
@@ -65,22 +64,20 @@ class EnvParamsSelector(object):
             else:
                 print("ill defined boundaries, use [min, max, nb_dims] format or [min, max] if nb_dims=1")
                 exit(1)
-        #print(mins)
-        #print(maxs) # todo remove
 
         # setup goals generator
-        if env_babbling == 'oracle':
+        if teacher == 'Oracle':
             self.goal_generator = OracleTeacher(mins, maxs, teacher_params['window_step_vector'], seed=seed)
-        elif env_babbling == 'random':
+        elif teacher == 'Random':
             self.goal_generator = RandomTeacher(mins, maxs, seed=seed)
-        elif env_babbling == 'riac':
+        elif teacher == 'RIAC':
             self.goal_generator = RIAC(mins, maxs, seed=seed, params=teacher_params)
-        elif env_babbling == 'gmm':
+        elif teacher == 'ALP-GMM':
             self.goal_generator = ALPGMM(mins, maxs, seed=seed, params=teacher_params)
-        elif env_babbling == 'bmm':
+        elif teacher == 'Covar-GMM':
             self.goal_generator = CovarGMM(mins, maxs, seed=seed, params=teacher_params)
         else:
-            print('Unknown env babbling')
+            print('Unknown teacher')
             raise NotImplementedError
 
         self.test_mode = "fixed_set"
@@ -102,7 +99,7 @@ class EnvParamsSelector(object):
     def record_train_episode(self, reward, ep_len):
         self.env_train_rewards.append(reward)
         self.env_train_len.append(ep_len)
-        if self.env_babbling != 'oracle':
+        if self.teacher != 'Oracle':
             reward = np.interp(reward, (-150, 350), (0, 1))
             self.env_train_norm_rewards.append(reward)
         self.goal_generator.update(self.env_params_train[-1], reward)

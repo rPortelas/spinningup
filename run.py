@@ -3,9 +3,12 @@ from spinup.utils.run_utils import setup_logger_kwargs
 from spinup.algos.sac.sac import sac
 from spinup.algos.sac import core
 import gym
+import gym_flowers
 from teachers.teacher_controller import EnvParamsSelector
 from collections import OrderedDict
+import os
 
+# Argument definition
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--exp_name', type=str, default='test')
@@ -20,15 +23,15 @@ parser.add_argument('--gpu_id', type=int, default=-1)  # default is no GPU
 parser.add_argument('--ent_coef', type=float, default=0.005)
 parser.add_argument('--max_ep_len', type=int, default=2000)
 parser.add_argument('--steps_per_ep', type=int, default=200000)
-parser.add_argument('--buf_size', type=int, default=1000000)
+parser.add_argument('--buf_size', type=int, default=2000000)
 parser.add_argument('--nb_test_episodes', type=int, default=50)
 parser.add_argument('--lr', type=float, default=1e-3)
 parser.add_argument('--train_freq', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=1000)
 
-# Parameterized bipedal walker related arguments
+# Parameterized bipedal walker arguments
 parser.add_argument('--env', type=str, default="flowers-Walker-continuous-v0")
-parser.add_argument('--env_babbling', type=str, default="none")
+parser.add_argument('--teacher', type=str, default="none")
 parser.add_argument('--max_stump_h', type=float, default=None)
 parser.add_argument('--max_stump_w', type=float, default=None)
 
@@ -46,19 +49,19 @@ parser.add_argument('--stump_seq', '-seq', action='store_true')
 
 # Teacher-specific arguments:
 
-# alp-gmm related arguments
+# ALPGMM (Absolute Learning Progress - Gaussian Mixture Model) related arguments
 parser.add_argument('--gmm_fitness_fun', '-fit', type=str, default=None)
 parser.add_argument('--nb_em_init', type=int, default=None)
 parser.add_argument('--min_k', type=int, default=None)
 parser.add_argument('--max_k', type=int, default=None)
 parser.add_argument('--fit_rate', type=int, default=None)
 parser.add_argument('--weighted_gmm', '-wgmm', action='store_true')
-parser.add_argument('--multiply_lp', '-lpm', action='store_true')
+parser.add_argument('--multiply_lp', '-lpm', action='store_true')  # TODO remove final
 
-# covar-gmm related arguments
+# CovarGMM related arguments
 parser.add_argument('--absolute_lp', '-alp', action='store_true')
 
-# riac related arguments
+# RIAC related arguments
 parser.add_argument('--max_region_size', type=int, default=None)
 parser.add_argument('--lp_window_size', type=int, default=None)
 
@@ -74,8 +77,7 @@ ac_kwargs = dict()
 if args.hid != -1:
     ac_kwargs['hidden_sizes'] = [args.hid] * args.l
 
-# Set bounds for environment's parameter space [min, max, nb_dimensions] (if no nb_dimensions, assumes only 1)
-# WARNING order matters !
+# Set bounds for environment's parameter space format:[min, max, nb_dimensions] (if no nb_dimensions, assumes only 1)
 param_env_bounds = OrderedDict()
 if args.max_stump_h is not None:
     param_env_bounds['stump_height'] = [0, args.max_stump_h]
@@ -90,9 +92,9 @@ if args.poly_shape:
 if args.stump_seq:
     param_env_bounds['stump_seq'] = [0, 6.0, 10]
 
-# Set teacher hyperparameters
+# Set Teacher hyperparameters
 params = {}
-if args.env_babbling == 'gmm':
+if args.teacher == 'ALP-GMM':
     if args.gmm_fitness_fun is not None:
         params['gmm_fitness_fun'] = args.gmm_fitness_fun
     if args.min_k is not None and args.max_k is not None:
@@ -105,15 +107,15 @@ if args.env_babbling == 'gmm':
         params['fit_rate'] = args.fit_rate
     if args.multiply_lp is True:
         params['multiply_lp'] = args.multiply_lp
-elif args.env_babbling == 'bmm':
+elif args.teacher == 'Covar-GMM':
     if args.absolute_lp is True:
         params['absolute_lp'] = args.absolute_lp
-elif args.env_babbling == "riac":
+elif args.teacher == "RIAC":
     if args.max_region_size is not None:
         params['max_region_size'] = args.max_region_size
     if args.lp_window_size is not None:
         params['lp_window_size'] = args.lp_window_size
-elif args.env_babbling == "oracle":
+elif args.teacher == "Oracle":
     if 'stump_height' in param_env_bounds and 'obstacle_spacing' in param_env_bounds:
         params['window_step_vector'] = [0.1, -0.2]  # order must match param_env_bounds construction
     elif 'poly_shape' in param_env_bounds:
@@ -122,7 +124,7 @@ elif args.env_babbling == "oracle":
     elif 'stump_seq' in param_env_bounds:
         params['window_step_vector'] = [0.1] * 10
     else:
-        print('oracle not defined for this parameter space')
+        print('Oracle not defined for this parameter space')
         exit(1)
 
 print('env_param_bounds')
@@ -134,15 +136,11 @@ if args.env == "flowers-Walker-continuous-v0":
     env_init['leg_size'] = args.leg_size
 
 # Initialize teacher
-Teacher = EnvParamsSelector(args.env_babbling, args.nb_test_episodes, param_env_bounds,
+Teacher = EnvParamsSelector(args.teacher, args.nb_test_episodes, param_env_bounds,
                             seed=args.seed, teacher_params=params)
 
 # Launch Student training
-sac(env_f, Teacher, actor_critic=core.mlp_actor_critic,
-    ac_kwargs=ac_kwargs,
-    gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-    logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
-    steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size,
-    env_babbling=args.env_babbling, env_init=env_init,
-    env_name=args.env, nb_test_episodes=args.nb_test_episodes, lr=args.lr, train_freq=args.train_freq,
-    batch_size=args.batch_size, teacher_params=params)
+sac(env_f, actor_critic=core.mlp_actor_critic, ac_kwargs=ac_kwargs, gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+    logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len, steps_per_epoch=args.steps_per_ep,
+    replay_size=args.buf_size, env_init=env_init, env_name=args.env, nb_test_episodes=args.nb_test_episodes, lr=args.lr,
+    train_freq=args.train_freq, batch_size=args.batch_size, Teacher=Teacher)

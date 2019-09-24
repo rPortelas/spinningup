@@ -1,14 +1,9 @@
 import numpy as np
 import tensorflow as tf
-import gym
-import gym_flowers
 import time
 from spinup.algos.sac import core
 from spinup.algos.sac.core import get_vars
 from spinup.utils.logx import EpochLogger
-from spinup.utils.normalization_utils import MaxMinFilter
-import os
-
 
 class ReplayBuffer:
     """
@@ -47,11 +42,11 @@ Soft Actor-Critic
 (With slight variations that bring it closer to TD3)
 
 """
-def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
-        steps_per_epoch=100000, epochs=100, replay_size=int(1e6), gamma=0.99,
-        polyak=0.995, lr=1e-3, alpha=0.005, batch_size=100, start_steps=10000,
-        max_ep_len=2000, logger_kwargs=dict(), save_freq=1, env_babbling="none", env_init=dict(),
-        env_name='unknown', nb_test_episodes=50, train_freq=1, teacher_params={}):
+def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
+        steps_per_epoch=200000, epochs=100, replay_size=int(1e6), gamma=0.99,
+        polyak=0.995, lr=1e-3, alpha=0.005, batch_size=1000, start_steps=10000,
+        max_ep_len=2000, logger_kwargs=dict(), save_freq=1, env_init=dict(),
+        env_name='unknown', nb_test_episodes=50, train_freq=10, Teacher=None):
     """
 
     Args:
@@ -136,7 +131,7 @@ def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
 
     logger = EpochLogger(**logger_kwargs)
     hyperparams = locals()
-    del hyperparams['Teacher'] # remove teacher to avoid serialization error
+    if Teacher: del hyperparams['Teacher']  # remove teacher to avoid serialization error
     logger.save_config(hyperparams)
 
     tf.set_random_seed(seed)
@@ -144,12 +139,13 @@ def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
 
     env, test_env = env_fn(), env_fn()
 
+    # initialize environment (choose between short, default or quadrupedal walker)
     if len(env_init.items()) > 0:
         env.env.my_init(env_init)
         test_env.env.my_init(env_init)
 
 
-    if env_babbling is not "none": Teacher.set_env_params(env)
+    if Teacher: Teacher.set_env_params(env)
     env.reset()
 
     obs_dim = env.env.observation_space.shape[0]
@@ -172,6 +168,7 @@ def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
     # Target value network
     with tf.variable_scope('target'):
         _, _, _, _, _, _, _, v_targ  = actor_critic(x2_ph, a_ph, **ac_kwargs)
+
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
@@ -240,7 +237,7 @@ def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
     def test_agent(n=10):
         global sess, mu, pi, q1, q2, q1_pi, q2_pi
         for j in range(n):
-            if env_babbling is not "none": Teacher.set_test_env_params(test_env)
+            if Teacher: Teacher.set_test_env_params(test_env)
             o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
             while not(d or (ep_len == max_ep_len)):
                 # Take deterministic actions at test time 
@@ -248,7 +245,7 @@ def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
                 ep_ret += r
                 ep_len += 1
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
-            Teacher.record_test_episode(ep_ret, ep_len)
+            if Teacher: Teacher.record_test_episode(ep_ret, ep_len)
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -305,8 +302,9 @@ def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
                              VVals=outs[6], LogPi=outs[7])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
-            Teacher.record_train_episode(ep_ret, ep_len)
-            if env_babbling is not "none": Teacher.set_env_params(env)
+            if Teacher:
+                Teacher.record_train_episode(ep_ret, ep_len)
+                Teacher.set_env_params(env)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
 
         # End of epoch wrap-up
@@ -336,124 +334,7 @@ def sac(env_fn, Teacher, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
             logger.log_tabular('LossV', average_only=True)
             logger.log_tabular('Time', time.time()-start_time)
             logger.dump_tabular()
+
             # Pickle parameterized env data
             #print(logger.output_dir+'/env_params_save.pkl')
-            Teacher.dump(logger.output_dir+'/env_params_save.pkl')
-
-if __name__ == '__main__':
-    pass
-    # TODO CLEANUP
-
-    # import argparse
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('--env', type=str, default="flowers-Walker-continuous-v0")
-    # parser.add_argument('--hid', type=int, default=-1)
-    # parser.add_argument('--l', type=int, default=1)
-    # parser.add_argument('--gamma', type=float, default=0.99)
-    # parser.add_argument('--seed', '-s', type=int, default=0)
-    # parser.add_argument('--epochs', type=int, default=100)
-    # parser.add_argument('--exp_name', type=str, default='sac')
-    # parser.add_argument('--gpu_id', type=int, default=-1)
-    # parser.add_argument('--ent_coef', type=float, default=0.005)
-    # parser.add_argument('--max_ep_len', type=int, default=2000)
-    # parser.add_argument('--steps_per_ep', type=int, default=200000)
-    # parser.add_argument('--buf_size', type=int, default=1000000)
-    # # Parameterized bipedal walker related arguments
-    # parser.add_argument('--env_babbling', type=str, default="none")
-    # #parser.add_argument('--max_stump_h', type=float, default=None)
-    # parser.add_argument('--max_stump_h', type=float, default=None)
-    # parser.add_argument('--max_stump_w', type=float, default=None)
-    # parser.add_argument('--max_stump_r', type=float, default=None)
-    # parser.add_argument('--max_tunnel_h', type=float, default=None)
-    # parser.add_argument('--roughness', type=float, default=None)
-    # parser.add_argument('--max_obstacle_spacing', type=float, default=None)
-    # parser.add_argument('--max_gap_w', type=float, default=None)
-    # parser.add_argument('--step_h', type=float, default=None)
-    # parser.add_argument('--step_nb', type=float, default=None)
-    # parser.add_argument('--norm_obs', type=int, default=False)
-    # parser.add_argument('--env_param_input', type=int, default=False)
-    # parser.add_argument('--nb_test_episodes', type=int, default=50)
-    # parser.add_argument('--lr', type=float, default=1e-3)
-    # parser.add_argument('--train_freq', type=int, default=1)
-    # parser.add_argument('--batch_size', type=int, default=100)
-    # parser.add_argument('--leg_size', type=str, default="default")
-    # parser.add_argument('--poly_shape', '-poly', action='store_true')
-    # parser.add_argument('--stump_seq', '-seq', action='store_true')
-    # parser.add_argument('--nb_rand_dim', type=int, default=0)
-    # # alp-gmm related arguments
-    # parser.add_argument('--gmm_fitness_fun', '-fit', type=str, default=None)
-    # parser.add_argument('--nb_em_init', type=int, default=None)
-    # parser.add_argument('--min_k', type=int, default=None)
-    # parser.add_argument('--max_k', type=int, default=None)
-    # parser.add_argument('--fit_rate', type=int, default=None)
-    # parser.add_argument('--weighted_gmm','-wgmm', action='store_true')
-    # parser.add_argument('--multiply_lp', '-lpm', action='store_true')
-    # # covar-gmm related arguments
-    # parser.add_argument('--absolute_lp', '-alp', action='store_true')
-    # # riac related arguments
-    # parser.add_argument('--max_region_size', type=int, default=None)
-    # parser.add_argument('--lp_window_size', type=int, default=None)
-    #
-    #
-    # args = parser.parse_args()
-    #
-    # from spinup.utils.run_utils import setup_logger_kwargs
-    # logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
-    #
-    # if args.gpu_id != -1:
-    #     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
-    #
-    # ac_kwargs = dict()
-    # if args.hid != -1:
-    #     ac_kwargs['hidden_sizes'] = [args.hid]*args.l
-    #
-    # params = {}
-    # if args.env_babbling == 'gmm':
-    #     if args.gmm_fitness_fun is not None:
-    #         params['gmm_fitness_fun'] = args.gmm_fitness_fun
-    #     if args.min_k is not None and args.max_k is not None:
-    #         params['potential_ks'] = np.arange(args.min_k, args.max_k,1)
-    #     if args.weighted_gmm is True:
-    #         params['weighted_gmm'] = args.weighted_gmm
-    #     if args.nb_em_init is not None:
-    #         params['nb_em_init'] = args.nb_em_init
-    #     if args.fit_rate is not None:
-    #         params['fit_rate'] = args.fit_rate
-    #     if args.multiply_lp is True:
-    #         params['multiply_lp'] = args.multiply_lp
-    # elif args.env_babbling == 'bmm':
-    #     if args.absolute_lp is True:
-    #         params['absolute_lp'] = args.absolute_lp
-    # elif args.env_babbling == "riac":
-    #     if args.max_region_size is not None:
-    #         params['max_region_size'] = args.max_region_size
-    #     if args.lp_window_size is not None:
-    #         params['lp_window_size'] = args.lp_window_size
-    #
-    #
-    # env_kwargs = {'roughness':args.roughness,
-    #               'stump_height': None if args.max_stump_h is None else [0, args.max_stump_h],
-    #               'stump_width': None if args.max_stump_w is None else [0, args.max_stump_w],
-    #               'stump_rot': None if args.max_stump_r is None else [0, args.max_stump_r],
-    #               'tunnel_height': None if args.max_tunnel_h is None else [0, args.max_tunnel_h],
-    #               'obstacle_spacing': None if args.max_obstacle_spacing is None else [0, args.max_obstacle_spacing],
-    #               'poly_shape': None if not args.poly_shape else [0,4.0],
-    #               'stump_seq': None if not args.stump_seq else [0,6.0],
-    #               'gap_width':args.max_gap_w,
-    #               'step_height':args.step_h,
-    #               'step_number':args.step_nb,
-    #               'env_param_input':args.env_param_input,
-    #               'nb_rand_dim':args.nb_rand_dim}
-    # env_f = lambda : gym.make(args.env)
-    # env_init = {}
-    # if args.env == "flowers-Walker-continuous-v0":
-    #     env_init['leg_size'] = args.leg_size
-    #
-    # sac(env_f, actor_critic=core.mlp_actor_critic,
-    #     ac_kwargs=ac_kwargs,
-    #     gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-    #     logger_kwargs=logger_kwargs, alpha=args.ent_coef, max_ep_len=args.max_ep_len,
-    #     steps_per_epoch=args.steps_per_ep, replay_size=args.buf_size,
-    #     env_babbling=args.env_babbling, env_kwargs=env_kwargs, env_init=env_init, norm_obs=args.norm_obs,
-    #     env_name=args.env, nb_test_episodes=args.nb_test_episodes, lr=args.lr, train_freq=args.train_freq,
-    #     batch_size=args.batch_size, teacher_params=params)
+            if Teacher: Teacher.dump(logger.output_dir+'/env_params_save.pkl')
