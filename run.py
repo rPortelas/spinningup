@@ -4,7 +4,7 @@ from spinup.algos.sac.sac import sac
 from spinup.algos.sac import core
 import gym
 import gym_flowers
-from teachers.teacher_controller import EnvParamsSelector
+from teachers.teacher_controller import TeacherController
 from collections import OrderedDict
 import os
 
@@ -63,7 +63,7 @@ parser.add_argument('--absolute_lp', '-alp', action='store_true')
 
 # RIAC related arguments
 parser.add_argument('--max_region_size', type=int, default=None)
-parser.add_argument('--lp_window_size', type=int, default=None)
+parser.add_argument('--alp_window_size', type=int, default=None)
 
 args = parser.parse_args()
 
@@ -113,8 +113,8 @@ elif args.teacher == 'Covar-GMM':
 elif args.teacher == "RIAC":
     if args.max_region_size is not None:
         params['max_region_size'] = args.max_region_size
-    if args.lp_window_size is not None:
-        params['lp_window_size'] = args.lp_window_size
+    if args.alp_window_size is not None:
+        params['alp_window_size'] = args.alp_window_size
 elif args.teacher == "Oracle":
     if 'stump_height' in param_env_bounds and 'obstacle_spacing' in param_env_bounds:
         params['window_step_vector'] = [0.1, -0.2]  # order must match param_env_bounds construction
@@ -136,7 +136,7 @@ if args.env == "flowers-Walker-continuous-v0":
     env_init['leg_size'] = args.leg_size
 
 # Initialize teacher
-Teacher = EnvParamsSelector(args.teacher, args.nb_test_episodes, param_env_bounds,
+Teacher = TeacherController(args.teacher, args.nb_test_episodes, param_env_bounds,
                             seed=args.seed, teacher_params=params)
 
 # Launch Student training

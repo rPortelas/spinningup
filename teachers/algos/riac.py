@@ -161,7 +161,7 @@ class RIAC():
 
         return is_split
 
-    def add_task_comp(self, node, task, reward):
+    def add_task_reward(self, node, task, reward):
         reg = node.data
         nid = node.identifier
         if reg.bounds.contains(task):  # task falls within region
