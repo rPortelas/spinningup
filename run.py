@@ -57,6 +57,7 @@ parser.add_argument('--min_k', type=int, default=None)
 parser.add_argument('--max_k', type=int, default=None)
 parser.add_argument('--fit_rate', type=int, default=None)
 parser.add_argument('--weighted_gmm', '-wgmm', action='store_true')
+parser.add_argument('--alp_max_size', type=int, default=None)
 parser.add_argument('--multiply_lp', '-lpm', action='store_true')  # TODO remove final
 
 # CovarGMM related arguments
@@ -108,6 +109,8 @@ if args.teacher == 'ALP-GMM':
         params['fit_rate'] = args.fit_rate
     if args.multiply_lp is True:
         params['multiply_lp'] = args.multiply_lp
+    if args.alp_max_size is not None:
+        params['alp_max_size'] = args.alp_max_size
 elif args.teacher == 'Covar-GMM':
     if args.absolute_lp is True:
         params['absolute_lp'] = args.absolute_lp
