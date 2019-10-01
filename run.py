@@ -7,6 +7,7 @@ import gym_flowers
 from teachers.teacher_controller import TeacherController
 from collections import OrderedDict
 import os
+import numpy as np
 
 # Argument definition
 parser = argparse.ArgumentParser()
