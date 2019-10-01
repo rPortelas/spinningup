@@ -289,7 +289,7 @@ class Dataset(object):
 class BufferedDataset(Dataset):
     """Add a buffer of a few points to avoid recomputing the kdtree at each addition"""
 
-    def __init__(self, dim_x, dim_y, buffer_size=200, lateness=5):
+    def __init__(self, dim_x, dim_y, buffer_size=200, lateness=5, max_size=None):
         """
             :arg dim_x:  the dimension of the input vectors
             :arg dim_y:  the dimension of the output vectors
@@ -300,6 +300,7 @@ class BufferedDataset(Dataset):
         self.buffer = Dataset(dim_x, dim_y, lateness=self.lateness)
         
         Dataset.__init__(self, dim_x, dim_y, lateness=0)
+        self.max_size = max_size
         
     def reset(self):
         self.buffer.reset()
@@ -316,6 +317,13 @@ class BufferedDataset(Dataset):
             self.buffer = Dataset(self.dim_x, self.dim_y, lateness=self.lateness)
             self.nn_ready = [False, False]
             self.buffer.add_xy(x, y)
+
+            # Reduce data size
+            if self.max_size and self.size > self.max_size:
+                n = self.size - self.max_size
+                del self.data[0][:n]
+                del self.data[1][:n]
+                self.size = self.max_size
         
     def add_xy_batch(self, x_list, y_list):
         assert len(x_list) == len(y_list)

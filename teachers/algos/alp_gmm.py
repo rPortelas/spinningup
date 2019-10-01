@@ -14,8 +14,8 @@ def proportional_choice(v, eps=0.):
 # Absolute Learning Progress (ALP) computer object
 # It uses a buffered kd-tree to efficiently implement a k-nearest-neighbor algorithm
 class EmpiricalALPComputer():
-    def __init__(self, task_size):
-        self.alp_knn = BufferedDataset(1, task_size, buffer_size=500, lateness=0)
+    def __init__(self, task_size, max_size=None, buffer_size=500):
+        self.alp_knn = BufferedDataset(1, task_size, buffer_size=buffer_size, lateness=0, max_size=max_size)
 
     def compute_alp(self, task, reward):
         alp = 0
@@ -65,8 +65,12 @@ class ALPGMM():
         self.random_task_ratio = 0.2 if "random_task_ratio" not in params else params["random_task_ratio"]
         self.random_task_generator = Box(self.mins, self.maxs, dtype=np.float32)
 
+        # Maximal number of episodes to account for when computing ALP
+        alp_max_size = None if "alp_max_size" not in params else params["alp_max_size"]
+        alp_buffer_size = 500 if "alp_buffer_size" not in params else params["alp_buffer_size"]
+
         # Init ALP computer
-        self.alp_computer = EmpiricalALPComputer(len(mins))
+        self.alp_computer = EmpiricalALPComputer(len(mins), max_size=alp_max_size, buffer_size=alp_buffer_size)
 
         self.tasks = []
         self.alps = []
