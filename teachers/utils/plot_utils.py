@@ -71,13 +71,13 @@ def plot_regions(boxes, interests, ax=None, xlabel='stump height', ylabel='spaci
     if bar:
         cax, _ = cbar.make_axes(ax, shrink=0.8)
         cb = cbar.ColorbarBase(cax, cmap=plt.cm.jet)
-        cb.set_label('Average Learning Progress', fontsize=ft_off + 5)
+        cb.set_label('Absolute Learning Progress', fontsize=ft_off + 5)
         cax.tick_params(labelsize=ft_off + 0)
     ax.set_xlim(left=xlim[0], right=xlim[1])
     ax.set_ylim(bottom=ylim[0], top=ylim[1])
     ax.set_xlabel(xlabel, fontsize=ft_off + 0)
     ax.set_ylabel(ylabel, fontsize=ft_off + 0)
-    ax.tick_params(axis='both', which='major', labelsize=ft_off + 0)
+    ax.tick_params(axis='both', which='major', labelsize=ft_off + 5)
     ax.set_aspect('equal', 'box')
 
 
@@ -158,8 +158,8 @@ def draw_competence_grid(ax, comp_grid, x_bnds, y_bnds, bar=True):
         cax.yaxis.set_ticks_position('left')
         cax.yaxis.set_label_position('left')
 
-def plot_gmm(weights, means, covariances, X=None, ax=None, xlim=[0,1], ylim=[0,1],
-             xlabel='jkl', ylabel='jhgj', bar=True, bar_side='right',no_y=False, color=None):
+def plot_gmm(weights, means, covariances, X=None, ax=None, xlim=[0,1], ylim=[0,1], xlabel='', ylabel='',
+             bar=True, bar_side='right',no_y=False, color=None):
     ft_off = 15
 
     ax = ax or plt.gca()
@@ -180,7 +180,7 @@ def plot_gmm(weights, means, covariances, X=None, ax=None, xlim=[0,1], ylim=[0,1
     if bar:
         cax, _ = cbar.make_axes(ax, location=bar_side, shrink=0.8)
         cb = cbar.ColorbarBase(cax, cmap=cmap)
-        cb.set_label('Learning progress', fontsize=ft_off + 5)
+        cb.set_label('Absolute Learning Progress', fontsize=ft_off + 5)
         cax.tick_params(labelsize=ft_off + 0)
         cax.yaxis.set_ticks_position(bar_side)
         cax.yaxis.set_label_position(bar_side)
@@ -188,10 +188,10 @@ def plot_gmm(weights, means, covariances, X=None, ax=None, xlim=[0,1], ylim=[0,1
     if no_y:
         ax.set_yticks([])
     else:
-        ax.set_ylabel('spacing', fontsize=ft_off + 5)
+        ax.set_ylabel(ylabel, fontsize=ft_off + 5)
         #ax.yaxis.set_label_position("right")
-    ax.set_xlabel('stump height', fontsize=ft_off + 5)
-    ax.tick_params(axis='both', which='major', labelsize=ft_off + 0)
+    ax.set_xlabel(xlabel, fontsize=ft_off + 5)
+    ax.tick_params(axis='both', which='major', labelsize=ft_off + 5)
     ax.set_aspect('equal', 'box')
 
 def draw_lineworld_info(ax, start_points, end_points, current_states):
@@ -215,15 +215,15 @@ def gmm_plot_gif(bk, gifname='test', gifdir='graphics/', ax=None,
     print("Making " + tmppath + gifname + ".gif")
     images = []
     old_ep = 0
-    gen_size = int(len(bk['goals_lps']) / len(bk['episodes']))
-    gs_lps = bk['goals_lps']
+    gen_size = int(len(bk['tasks_lps']) / len(bk['episodes']))
+    gs_lps = bk['tasks_lps']
     for i,(ws, covs, means, ep) in enumerate(zip(bk['weights'], bk['covariances'], bk['means'], bk['episodes'])):
             plt.figure(figsize=fig_size)
             ax = plt.gca()
             plot_gmm(ws, means, covs, np.array(gs_lps[old_ep + gen_size:ep + gen_size]),
                      ax=ax, xlim=xlim, ylim=ylim,
                      bar=bar)  # add gen_size to have gmm + the points that they generated, not they fitted
-            if 'comp_grid' in bk:  # add competence grid info
+            if 'comp_grids' in bk:  # add competence grid info
                 draw_competence_grid(ax,bk['comp_grids'][i], bk['comp_xs'][i], bk['comp_ys'][i])
             if 'start_points' in bk:  # add lineworld info
                 draw_lineworld_info(ax, bk['start_points'], bk['end_points'], bk['current_states'][i])
@@ -365,12 +365,12 @@ def cmaes_plot_gif(bk, gifname='testcmaes', gifdir='graphics/', ax=None):
         print("Directory ", tmppath, " already exists")
     filenames = []
     images = []
-    bk['goals'] = np.array(bk['goals'])
+    bk['tasks'] = np.array(bk['tasks'])
     prev_ep = 0
     for cov, mean, ep, sig in zip(bk['covariances'], bk['means'], bk['episodes'], bk['sigmas']):
             ax = plt.gca()
-            plot_cmaes(mean, cov, bk['interests'][0:ep], bk['goals'][0:ep], sig,
-                       currX=bk['goals'][prev_ep:ep],
+            plot_cmaes(mean, cov, bk['interests'][0:ep], bk['tasks'][0:ep], sig,
+                       currX=bk['tasks'][prev_ep:ep],
                        currInts=bk['interests'][prev_ep:ep], ax=ax)
             prev_ep = ep
             f_name = gifdir+tmpdir+"scatter_{}.png".format(ep)
